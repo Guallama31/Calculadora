@@ -61,12 +61,13 @@ Filtros globales **Category / Tier / Enchantment / Quality**, contador «Communi
 Se integró como el módulo **Flipping** de la navegación lateral, compartiendo servidor, calidad y Premium con el resto de la app.
 
 ```
-src/modules/flipping/scanner.js   candidatos, descarga por lotes, evaluación y ranking
-src/modules/flipping/index.js     4 estrategias en pestañas, filtros, resultados y puente
-src/services/engine.js           calculate() y calculateFlip() con los mismos impuestos
-src/services/bonus.js            bonus por ciudad (craftingmodifiers.json + world.json) → RRR
-src/modules/crafting/            recibe la oportunidad por ctx.opportunity y la precarga
-data/catalog.js                  + ccat, refine y upgrade (encantamiento)
+src/modules/flipping/scanner.js        candidatos, descarga por lotes, evaluación y ranking (JS puro)
+src/modules/flipping/ScannerView.jsx   4 estrategias en pestañas, filtros, resultados y puente
+src/services/engine.js                calculate() y calculateFlip() con los mismos impuestos
+src/services/bonus.js                 bonus por ciudad (craftingmodifiers.json + world.json) → RRR
+src/modules/crafting/CalculatorView.jsx  recibe la oportunidad por AppContext y la precarga
+src/app/AppContext.jsx                navegación, estado compartido y pending.opportunity
+data/catalog.js                       + ccat, refine y upgrade (encantamiento)
 ```
 
 **Mapeo ciudad → bonus** (de los dumps del juego):
