@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "./main.css";
+@import "./shell.css";
+
+/* Tokens del ejemplo (shadcn) mapeados a nuestra paleta azul / dorado. */
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #1b2740;
+  --color-primary: #1e5ed0;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eaf1ff;
+  --color-secondary-foreground: #1648a4;
+  --color-muted: #f5f7fb;
+  --color-muted-foreground: #6b7893;
+  --color-accent: #eaf1ff;
+  --color-accent-foreground: #1648a4;
+  --color-border: #e0e6f0;
+  --color-ring: #1e5ed0;
+  --color-gold: #d3a12c;
+  --color-success: #16804b;
+  --color-destructive: #c33c3c;
+  --radius-lg: 13px;
+  --radius-md: 9px;
+  --radius-sm: 6px;
+}
