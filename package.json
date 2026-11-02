@@ -1,0 +1,13 @@
+{
+  "name": "calculadora",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Calculadora de Albion Online: crafteo, flipping, refinamiento, encantamiento y precios.",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "start": "node tools/serve.mjs",
+    "check": "node tools/check.mjs",
+    "catalog": "python3 tools/generate_catalog.py"
+  }
+}

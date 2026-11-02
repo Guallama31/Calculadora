@@ -1,56 +1,98 @@
-# 🛡️ Calculadora Albion Online
+# Calculadora
 
-Web propia de calculadoras para **Albion Online**, creada en español y adaptada a nuestras necesidades. Inspirada en herramientas como Albion Intel, Albion Market Online y Albion Codex, pero con las funciones que realmente usamos.
+**Calculadora** es una web **HTML + CSS + JavaScript nativo** (módulos ES, sin build, sin frameworks y sin registro) para calcular la rentabilidad real de producir, encantar, refinar o revender ítems de Albion Online, y para encontrar oportunidades de mercado entre ciudades.
 
-## 📦 ¿Qué incluye?
+Trabaja con **8.302 recetas reales del juego**, los **precios del Albion Online Data Project**, los **bonus de producción por ciudad** y **todos los impuestos** que se pagan al vender. Para servidor **Américas (West)** por defecto; también Asia (East) y Europa.
 
-Calculadoras de una sola página, sin registro y sin dependencias externas (salvo la tipografía de Google Fonts):
+## Diseño
 
-| Calculadora | ¿Para qué sirve? |
-|-------------|------------------|
-| **Fabricación (Crafting)** | Ganancia neta por objeto: materiales, tasa de estación, impuesto ciudad, Return Rate y coste de focus. |
-| **Refinado** | Lingotes/tabla/tela/cuero/piedra: coste de materia prima, devolución por RRR, tasas y ganancia por lote/unidad. |
-| **Recursos** | Cuántos recursos crudos necesitas reunir/comprar para un objetivo de refinados, descontando el Return Rate. |
-| **Mercado / Flip** | Compra barata, venta cara: margen real tras el impuesto de transacción, ganancia por unidad y ROI. |
-| **Fama (Destiny Board)** | Estimación de fama necesaria para subir niveles de maestría, con bonificador opcional. |
+- Fondo blanco / gris muy claro, tarjetas con bordes suaves y **azul** como color principal; **dorado** para acentos y precios manuales.
+- **Navegación lateral** con 10 módulos agrupados en *Producción* y *Mercado*, **contraíble** (el estado se guarda en `localStorage`).
+- **Pestañas horizontales** dentro de cada módulo.
+- Distribución en dos columnas: **configuración a la izquierda, resultados a la derecha**.
+- Botones principales azules y **ganancias positivas en verde**.
+- Cabecera con servidor, calidad y Premium compartidos por todos los módulos.
 
-## 🚀 Cómo usarla
+## Módulos
 
-1. Abre `index.html` en cualquier navegador moderno.
-2. Elige una calculadora del menú superior o haz scroll hasta la sección.
-3. Rellena los campos con valores del juego (plata, porcentajes, cantidades).
-4. Pulsa **Calcular** (o Enter en cualquier campo) y lee el resultado con el veredicto (rentable / no rentable / punto muerto).
+| Módulo | Qué hace |
+|---|---|
+| **Crafteo** | Calculadora completa: receta, materiales editables, RRR, diarios, tasa de estación, impuestos, comparativa Premium y comparación de ciudades. |
+| **Encantamiento** | El mismo motor sobre recetas de ítems encantados (runas, almas y reliquias). |
+| **Refinamiento** | Recetas de refinado con el bonus real de la ciudad. |
+| **Agricultura**, **Animales**, **Monturas**, **Alquimia**, **Cocina** | La misma calculadora filtrada al catálogo de cada actividad. |
+| **Flipping** | Escáner con 4 estrategias en pestañas: *Flip*, *Royal → BM*, *Craft Trades* y *Refining Trades*. |
+| **Precios** | Matriz de precios por ciudad y comparativa por calidad, con antigüedad de cada dato. |
 
-No hay servidor ni base de datos: todo se calcula en tu navegador y nada sale de tu equipo.
+## Qué se puede configurar
 
-## 🧠 Conceptos clave (estilo Albion)
+- **Ítem y encantamiento**: buscador con autocompletado (nombre ES/EN o ID, tolerante a acentos) y chips `.0`–`.4`.
+- **Dónde craftear / refinar**: la ciudad aplica su bonus real (base 0,18; +0,40 para refinado; +0,15 por categoría; Focus +0,59; bonus diario) y calcula el RRR automáticamente. También existe modo *Automática*.
+- **Dónde comprar** los materiales y **dónde vender** el ítem, con compra inmediata / orden de compra y venta directa / orden de venta.
+- **Precios manuales** para materiales, venta, diarios y tarifa de estación (introducida a mano). «Cargar precios del mercado» completa los datos desde AODP y **respeta los valores manuales** salvo que se active «Sobrescribir».
+- **Impuestos**: 4 % con Premium / 8 % sin Premium, tarifa de orden de venta 2,5 % (más republicaciones), tarifa de orden de compra opcional y comparativa lado a lado con/sin Premium.
+- **Diarios de crafteo** con fama, diarios vacíos y llenos.
+- **Resultado**: desglose completo, ganancia neta, ROI, ganancia por ítem, precio de equilibrio y comparación de ganancia por ciudad.
+- **Escáner**: filtros de categoría, tier, encantamiento, ciudad de compra, ciudades de venta, rutas seguras, RRR, Focus, bonus diario, tasa de estación, ganancia mínima, ROI mínimo, antigüedad máxima, orden y límite de filas. Cada fila se puede **abrir en la calculadora** con el ítem, las ciudades y los precios precargados.
 
-- **Return Rate (RRR):** probabilidad de recuperar materiales al fabricar o refinar. Cuanto más alta, menor el coste neto.
-- **Focus:** puntos de enfoque que aumentan el Return Rate. Se puede valorar en plata por punto.
-- **Tasa de estación:** comisión del taller/refinería donde trabajas.
-- **Impuesto ciudad:** porcentaje que se queda la ciudad por la transacción/venta.
-- **ROI:** retorno sobre la inversión, en porcentaje.
+## Cómo ejecutarla
 
-## 🗂️ Estructura del repositorio
+Necesitás un servidor estático porque la app usa módulos ES (no funciona abriendo `index.html` con `file://`):
+
+```bash
+npm run dev          # servidor estático sin dependencias en http://localhost:8000
+npm run check        # verifica la sintaxis de todos los archivos JS
+npm run catalog      # regenera el catálogo desde ao-bin-dumps (requiere Python 3)
+```
+
+`npm run dev` no instala nada: `tools/serve.mjs` sirve el repo con Node. También podés usar `python3 -m http.server 8000`.
+
+## Estructura
 
 ```
 Calculadora/
-├── index.html   # Estructura de la web (una sola página)
-├── style.css    # Estilos: tema oscuro fantástico, responsive
-├── script.js    # Lógica de todas las calculadoras (vanilla JS)
-└── README.md    # Este archivo
+├── index.html                          # punto de entrada: #app + CSS + módulo
+├── package.json                        # scripts dev / start / check / catalog
+├── data/
+│   └── catalog.js                      # módulo ES con 8.302 recetas generadas
+├── src/
+│   ├── main.js                         # navegación, preferencias y estado compartido
+│   ├── components/
+│   │   ├── layout/{Header,Sidebar,MainLayout}.js
+│   │   ├── common/{Tabs,Select,DataTable,ResultCard,ItemSelector}.js
+│   │   └── charts/PriceBars.js
+│   ├── modules/
+│   │   ├── crafting/                   # CalculatorView: vista reutilizable
+│   │   ├── flipping/                   # scanner.js + vista de 4 estrategias
+│   │   ├── prices/                     # matriz de ciudades y calidades
+│   │   ├── enchanting/ refining/ farming/ animals/ mounts/ alchemy/ cooking/
+│   │   └── index.js                    # registro de módulos
+│   ├── settings/index.js               # ciudades, impuestos, módulos, defaults
+│   ├── services/                       # catalog, api, engine, bonus, format, storage
+│   └── styles/main.css                 # tema claro, azul/dorado, responsive
+├── tools/
+│   ├── serve.mjs                       # servidor estático sin dependencias
+│   ├── check.mjs                       # node --check sobre src/tools/data
+│   └── generate_catalog.py             # regenera data/catalog.js
+└── docs/
+    ├── analisis-albion-analytics.md    # análisis del repositorio de referencia (WPF)
+    ├── analisis-albionmarkethub.md     # revisión de Albion Market Hub
+    └── implementacion.md               # arquitectura, fórmulas y decisiones
 ```
 
-## 🛠️ Personalizar
+Todo el estado se guarda en `localStorage` (`calculadora-prefs-v1`): ciudad de crafteo, compra/venta, Focus, bonus diario, colapso de la barra, Premium, servidor y calidad.
 
-- Añade más calculadoras en `index.html` repitiendo el bloque `<section class="panel" id="...">`.
-- Implementa su lógica en `calc` dentro de `script.js`.
-- Ajusta colores en `:root` de `style.css` (oro Albion por defecto: `#d4a017`).
+## Fuentes y créditos
 
-## ⚠️ Aviso
+- Recetas, `itemValue`, bonuses por ciudad, nombres localizados y materiales de encantamiento: [ao-data/ao-bin-dumps](https://github.com/ao-data/ao-bin-dumps).
+- Precios: [Albion Online Data Project](https://www.albion-online-data.com/api/) (datos subidos por la comunidad).
+- Iconos: Albion Render Service.
+- Reglas de impuestos: [Albion Online Wiki – Marketplace](https://wiki.albiononline.com/wiki/Marketplace) y [Margin](https://wiki.albiononline.com/wiki/Margin).
+- Lógica y modelo de datos inspirados en [Triky313/AlbionOnline-StatisticsAnalysis](https://github.com/Triky313/AlbionOnline-StatisticsAnalysis) (GPL-3.0), **reimplementados en JavaScript**.
+- Funciones y filtros del escáner inspirados en [Albion Market Hub](https://albionmarkethub.com/trades); ver `docs/analisis-albionmarkethub.md`.
 
-Esta herramienta es educativa y de referencia. Los precios de mercado cambian constantemente en Albion Online; introdúcelos manualmente desde el juego o desde una fuente de precios actualizada. No estamos afiliados con Sandbox Interactive ni Albion Online.
+> Sin backend: el escáner consulta la API pública directamente y analiza un subconjunto acotado de ítems por búsqueda. No hay auto-refresh; si la API responde `429`, reducí el número de ítems o esperá. La app ofrece precios manuales y un proxy CORS opcional.
 
----
+## Aviso
 
-Hecho con ❤️ para la comunidad de Albion Online.
+Herramienta educativa y de referencia, no afiliada a Sandbox Interactive ni a Albion Online. Los precios cambian constantemente: verificá siempre en el juego antes de invertir plata.
