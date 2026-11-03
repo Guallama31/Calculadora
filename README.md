@@ -90,12 +90,11 @@ Calculadora/
 │   └── generate_catalog.py             # regenera el catálogo
 ├── tests/                              # setup, fixtures AODP y pruebas de la app
 ├── public/favicon.svg
-├── .github/workflows/ci.yml            # lint + check + test + build
+├── .github/workflows/ci.yml            # formato + lint + check + test + build
 └── docs/
     ├── analisis-albion-analytics.md    # análisis del repositorio de referencia (WPF, histórico)
     ├── analisis-albionmarkethub.md     # revisión de Albion Market Hub
-    ├── implementacion.md               # arquitectura, fórmulas y decisiones
-    └── informe-revision-2026-11-03.md  # revisión técnica y correcciones aplicadas
+    └── implementacion.md               # arquitectura, fórmulas y decisiones
 ```
 
 Todo el estado se guarda en `localStorage` (`calculadora-prefs-v1`): ciudad de crafteo, compra/venta, Focus, bonus diario, Premium, servidor, calidad y último ítem. Las cotizaciones válidas de AODP se guardan en IndexedDB (`calculadora-market-cache`, retención de 90 días) y se usan como referencia si la API falla o tarda más de 15 s.
