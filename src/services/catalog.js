@@ -39,11 +39,21 @@ export function initializeCatalog({ CATALOG = [], MOUNT_BREEDING = [], MOUNT_FOO
       position,
       id: normalize(classified.id),
       name: normalize(`${classified.es} ${classified.en}`),
-      text: normalize([
-        classified.es, classified.en, classified.id, classified.cat, classified.sub, classified.sub2,
-        categoryLabel(classified.categoryId), classified.categoryId, classified.subcategoryId,
-        classified.familyId, ...classified.tags,
-      ].join(' ')),
+      text: normalize(
+        [
+          classified.es,
+          classified.en,
+          classified.id,
+          classified.cat,
+          classified.sub,
+          classified.sub2,
+          categoryLabel(classified.categoryId),
+          classified.categoryId,
+          classified.subcategoryId,
+          classified.familyId,
+          ...classified.tags,
+        ].join(' '),
+      ),
     });
   });
 
@@ -56,7 +66,18 @@ export function initializeCatalog({ CATALOG = [], MOUNT_BREEDING = [], MOUNT_FOO
 
 export { categoryLabel, subcategoryLabel };
 
-export function get(id) { return byId.get(id) || null; }
+/* El dump del juego no trae `<LocalizedNames>` para los mapas de mazmorra
+   (T*_RANDOM_DUNGEON_*_TOKEN*) ni para algunas monturas de evento, así que su
+   nombre visible es el propio ID. `tools/generate_catalog.py` marca esas
+   entradas con `untranslated: true` y la interfaz lo aclara. */
+export const UNTRANSLATED_LABEL = 'sin nombre en el dump';
+export function isUntranslated(entry) {
+  return Boolean(entry && entry.untranslated);
+}
+
+export function get(id) {
+  return byId.get(id) || null;
+}
 export function variants(base) {
   return (byBase.get(base) || []).slice().sort((a, b) => a.lvl - b.lvl);
 }
@@ -66,7 +87,9 @@ export function enchantmentVariants(base) {
 export function isEnchantableBase(entry) {
   return !!entry && entry.lvl === 0 && enchantmentVariants(entry.base).length > 0;
 }
-export function icon(id, quality = 1) { return `${RENDER}${id}.png?quality=${quality}`; }
+export function icon(id, quality = 1) {
+  return `${RENDER}${id}.png?quality=${quality}`;
+}
 
 export function search(query, limit = 50, filter = null) {
   const pool = filter ? entries.filter(filter) : entries;
@@ -79,7 +102,9 @@ export function search(query, limit = 50, filter = null) {
       const score = (entry.lvl === 0 ? 0 : 2) + (entry.tier >= 4 && entry.tier <= 6 ? 0 : 1);
       scored.push({ entry, score });
     });
-    scored.sort((a, b) => a.score - b.score || b.entry.tier - a.entry.tier || a.entry.id.length - b.entry.id.length);
+    scored.sort(
+      (a, b) => a.score - b.score || b.entry.tier - a.entry.tier || a.entry.id.length - b.entry.id.length,
+    );
     return scored.slice(0, limit).map(x => x.entry);
   }
   index.forEach(row => {
@@ -106,10 +131,18 @@ export function search(query, limit = 50, filter = null) {
 
 export function categoryOf(id) {
   const entry = get(id);
-  return entry ? {
-    cat: entry.cat, sub: entry.sub, sub2: entry.sub2, ccat: entry.ccat,
-    categoryId: entry.categoryId, subcategoryId: entry.subcategoryId,
-    familyId: entry.familyId, tags: entry.tags, classificationRule: entry.classificationRule,
-    classificationVersion: entry.classificationVersion,
-  } : null;
+  return entry
+    ? {
+        cat: entry.cat,
+        sub: entry.sub,
+        sub2: entry.sub2,
+        ccat: entry.ccat,
+        categoryId: entry.categoryId,
+        subcategoryId: entry.subcategoryId,
+        familyId: entry.familyId,
+        tags: entry.tags,
+        classificationRule: entry.classificationRule,
+        classificationVersion: entry.classificationVersion,
+      }
+    : null;
 }

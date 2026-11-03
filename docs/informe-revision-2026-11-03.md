@@ -233,8 +233,8 @@ No existe `ErrorBoundary` ni `componentDidCatch` en `src/`. Cualquier excepción
 * 8.382 entradas, sin IDs duplicados, todas con receta ✅, cifra coherente con el README ✅.
 * **23 entradas sin `value`** (`T2_SKILLBOOK_NONTRADABLE`, `T3_ALCHEMY_RARE_*`, …): con `itemValue = 0` la nutrición y, por lo tanto, la **tasa de estación** calculada es 0 → craftearlas parece gratis. Conviene marcarlas como «valor desconocido» en vez de 0.
 * 1.849 entradas sin `journal` ✅ (correcto: no todas las recetas dan diario).
-* `MOUNT_FOODS`: **8 de 171** con `es === id` (sin traducir, p. ej. `T8_MOUNT_ARMORED_HORSE_MORGANA`), y varios `T8_FARM_*_GROWN` sin nombre en español.
-* `tools/generate_catalog.py` usa `REF = "master"`: regenerar hoy puede producir un catálogo distinto sin dejar rastro de qué versión del dump se usó. **Recomendado fijar el SHA** del dump y escribirlo en la cabecera del archivo generado.
+* `MOUNT_FOODS`: **8 de 171** con `es === id` (sin traducir, p. ej. `T8_MOUNT_ARMORED_HORSE_MORGANA`), y varios `T8_FARM_*_GROWN` sin nombre en español. *(Dimensionado y resuelto como se explica en 9.6.)*
+* `tools/generate_catalog.py` usa `REF = "master"`: regenerar hoy puede producir un catálogo distinto sin dejar rastro de qué versión del dump se usó. **Recomendado fijar el SHA** del dump y escribirlo en la cabecera del archivo generado. *(Aplicado en 9.6.)*
 * `data/catalog.js` es un artefacto generado de 5,5 MB en **una sola línea**: cualquier regeneración produce un diff de 5 MB ilegible y el repo `.git` ya pesa 1,5 MB. Alternativa a evaluar: generar JSON comprimido y cargarlo con `fetch` (permitiría *cache* HTTP y sacarlo del bundle).
 
 ---
@@ -354,16 +354,32 @@ Todas las acciones del §7 se implementaron y se verificaron con la batería com
 | Comprobación | Resultado |
 |---|---|
 | `npm ci` | 0 vulnerabilidades (`overrides.minimatch` a 11.x evita el aviso de ESLint; era el único paquete afectado, de desarrollo) |
+| `npm run format:check` | Todo el código con el estilo de Prettier |
 | `npm run lint` | 0 errores, 0 avisos |
-| `npm run check` | 54/54 archivos con sintaxis correcta |
-| `npm test` | **98 pruebas en 9 archivos**, todas en verde |
-| `npm run test:coverage` | 87,5 % sentencias · 79,3 % ramas · 83,0 % funciones · 91,5 % líneas |
+| `npm run check` | 55/55 archivos con sintaxis correcta |
+| `npm test` | **102 pruebas en 10 archivos**, todas en verde |
+| `npm run test:coverage` | 87,5 % sentencias · 79,3 % ramas · 82,9 % funciones · 90,2 % líneas |
 | `npm run build` | 1.675 módulos, `dist/` con `index.html`, CSS, chunk de app, chunk de catálogo y `docs/` |
 | `npm run dev` | Catálogo servido sin transformar por el middleware; `/favicon.svg` y `/docs/*.md` responden 200 |
 
-### 9.6 Lo que queda pendiente (decisión del dueño)
+### 9.6 Segunda tanda: formato, catálogo reproducible y nombres ausentes
 
-- **Formato**: Prettier está configurado y disponible (`npm run format`), pero no se aplicó al código existente para no mezclar un diff de miles de líneas con los cambios funcionales.
-- **Licencia**: se dejó `license: UNLICENSED`; elegir una licencia (MIT, GPL-3.0…) es una decisión del autor, no del revisor.
-- **Catálogo reproducible**: `tools/generate_catalog.py` sigue usando `REF = "master"`. Fijar un SHA del dump y anotarlo en la cabecera del archivo generado requiere regenerar los 5 MB y validar el resultado contra la app; conviene hacerlo en un commit aparte.
-- **Traducciones**: 8 de 171 alimentos de montura siguen mostrando el ID porque el dump no trae nombre en español.
+Los tres pendientes técnicos del informe se resolvieron en un commit aparte, sin tocar la licencia.
+
+**Formato.** Se aplicó Prettier a los 55 archivos de código (54 reformateados). Se añadió `npm run format:check` y el paso «Formato (Prettier)» al CI, antes del lint, para que el estilo no vuelva a divergir. `data/catalog.js` y `docs/` quedan fuera por `.prettierignore` (el primero es un artefacto generado; el segundo, prosa).
+
+**Catálogo reproducible.** `tools/generate_catalog.py` ahora fija `REF = "0483dd97f1581dfaf02eed42f25f5ea2a3cb75e5"` (dump del 2026-11-02), acepta `--ref <sha>` y `--out <ruta>`, y escribe el commit en la cabecera de `data/catalog.js`. La validación fue concluyente: regenerado con ese SHA, el archivo sale **idéntico byte a byte** al versionado salvo la propia cabecera, así que el catálogo del repo ya venía de ese commit y el pin no cambia ningún dato.
+
+**Nombres ausentes.** El dump no puede resolverlos: de 83 IDs sin nombre en español, **74 no existen** en `formatted/items.json` (todas las familias `T*_RANDOM_DUNGEON_*_TOKEN*` y sus variantes `_D1`–`_D4`) y **8 existen sin `<LocalizedNames>`** (`T8_*_PROTOTYPE`, `UNIQUE_MOUNT_RHINO_TELLAFRIEND`, `UNIQUE_MOUNT_PANDA_TELLAFRIEND`, monturas T8 de evento). Es decir, no es un fallo del generador: el dato no está en la fuente. En lugar de inventar traducciones, el generador marca esas entradas con `untranslated: true` (127 filas: 119 recetas y 8 alimentos de montura) y la interfaz:
+
+- muestra la etiqueta «sin nombre en el dump» en la ficha del ítem (`ItemSelector`), y
+- avisa en Crianza cuando la cría o el alimento elegido no tienen nombre oficial.
+
+Queda cubierto por `tests/catalog.test.jsx` (4 pruebas: la bandera solo afecta a lo marcado, sobrevive al registro del catálogo y los nombres en español no se marcan). Si se quieren nombres en español para esos ítems, es una tabla curada a mano —las variantes de mapa no se distinguen entre sí en el dump—, y por eso se deja como decisión aparte.
+
+**Otros ajustes de la tanda.** Los dos avisos de `react-hooks/exhaustive-deps` de `CalculatorView` desaparecieron reemplazando el `useMemo` de configuración inicial por una función `initialConfig(prefs)` usada como inicializador perezoso de `useState` (mismo comportamiento, sin `eslint-disable`).
+
+### 9.7 Lo que sigue pendiente
+
+- **Licencia**: se dejó `license: UNLICENSED`; elegir una licencia (MIT, GPL-3.0…) es una decisión del autor, no del revisor. Fuera de alcance por pedido del dueño.
+- **Nombres de los 83 IDs sin dato**: si se quieren mostrar en español, hace falta una tabla curada en `tools/generate_catalog.py`. Hoy se muestran como ID con la etiqueta correspondiente.
