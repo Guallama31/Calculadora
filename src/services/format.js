@@ -11,21 +11,31 @@ export const money = v => fmt(v) + ' p';
 
 export function esc(value) {
   return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function normalize(value) {
-  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9@._]+/g, ' ').trim();
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9@._]+/g, ' ')
+    .trim();
 }
 
 export function ageInfo(minutes) {
   if (!isFinite(minutes)) return { label: 'sin dato', tone: 'none' };
   const tone = minutes > 480 ? 'stale' : minutes > 240 ? 'old' : minutes > 120 ? 'warn' : 'fresh';
-  const label = minutes < 60 ? Math.floor(minutes) + ' min'
-    : minutes < 1440 ? Math.floor(minutes / 60) + ' h'
-      : Math.floor(minutes / 1440) + ' d';
+  const label =
+    minutes < 60
+      ? Math.floor(minutes) + ' min'
+      : minutes < 1440
+        ? Math.floor(minutes / 60) + ' h'
+        : Math.floor(minutes / 1440) + ' d';
   return { label, tone };
 }
 

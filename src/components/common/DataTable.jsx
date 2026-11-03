@@ -7,7 +7,13 @@ export function DataTable({ columns, rows = [], empty = 'Sin datos', className =
       <div className="table-scroll">
         <table className={cn('data-table', className)}>
           <thead>
-            <tr>{columns.map((c, i) => <th key={c.label || i} className={c.align === 'right' ? 'num' : ''}>{c.label}</th>)}</tr>
+            <tr>
+              {columns.map((c, i) => (
+                <th key={c.label || i} className={c.align === 'right' ? 'num' : ''}>
+                  {c.label}
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
             {rows.map((row, ri) => (

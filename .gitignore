@@ -5,3 +5,7 @@ dist/
 .DS_Store
 
 coverage/
+
+# Python (tools/generate_catalog.py)
+__pycache__/
+*.py[cod]

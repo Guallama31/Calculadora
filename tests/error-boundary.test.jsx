@@ -17,7 +17,11 @@ describe('barrera de errores', () => {
 
   it('muestra el error en lugar de dejar la pantalla en blanco', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<ErrorBoundary><Boom explode /></ErrorBoundary>);
+    render(
+      <ErrorBoundary>
+        <Boom explode />
+      </ErrorBoundary>,
+    );
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toContain('explotó el módulo');
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
@@ -31,7 +35,11 @@ describe('barrera de errores', () => {
       if (explode) throw new Error('fallo temporal');
       return <p>contenido recuperado</p>;
     }
-    render(<ErrorBoundary><Flaky /></ErrorBoundary>);
+    render(
+      <ErrorBoundary>
+        <Flaky />
+      </ErrorBoundary>,
+    );
     explode = false;
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(screen.getByText('contenido recuperado')).toBeTruthy();

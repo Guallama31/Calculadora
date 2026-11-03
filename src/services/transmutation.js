@@ -35,13 +35,15 @@ export function buildTransmutationCandidates(refiningEntries) {
     const type = RESOURCE_TYPES[entry.ccat];
     if (!entry.refine || !type) continue;
     const prefix = `T${entry.tier}_${type.suffix}`;
-    const id = entry.lvl === 0
-      ? prefix
-      : `${prefix}_LEVEL${entry.lvl}@${entry.lvl}`;
+    const id = entry.lvl === 0 ? prefix : `${prefix}_LEVEL${entry.lvl}@${entry.lvl}`;
     const material = entry.res?.find(resource => resource.id === id);
     if (!material) continue;
     resources.set(`${entry.ccat}|${entry.tier}|${entry.lvl}`, {
-      id, es: material.es, type: entry.ccat, tier: entry.tier, level: entry.lvl,
+      id,
+      es: material.es,
+      type: entry.ccat,
+      tier: entry.tier,
+      level: entry.lvl,
     });
   }
 
@@ -52,8 +54,12 @@ export function buildTransmutationCandidates(refiningEntries) {
     const enchantFee = transmutationFee('enchantment', source.tier, source.level);
     if (enchantTarget && enchantFee != null) {
       candidates.push({
-        id: `${source.id}->${enchantTarget.id}`, kind: 'enchantment',
-        type: source.type, source, target: enchantTarget, fee: enchantFee,
+        id: `${source.id}->${enchantTarget.id}`,
+        kind: 'enchantment',
+        type: source.type,
+        source,
+        target: enchantTarget,
+        fee: enchantFee,
       });
     }
 
@@ -61,24 +67,37 @@ export function buildTransmutationCandidates(refiningEntries) {
     const tierFee = transmutationFee('tier', source.tier + 1, source.level);
     if (tierTarget && tierFee != null) {
       candidates.push({
-        id: `${source.id}->${tierTarget.id}`, kind: 'tier',
-        type: source.type, source, target: tierTarget, fee: tierFee,
+        id: `${source.id}->${tierTarget.id}`,
+        kind: 'tier',
+        type: source.type,
+        source,
+        target: tierTarget,
+        fee: tierFee,
       });
     }
   }
 
-  return candidates.sort((a, b) => a.type.localeCompare(b.type)
-    || a.source.tier - b.source.tier
-    || a.source.level - b.source.level
-    || a.kind.localeCompare(b.kind));
+  return candidates.sort(
+    (a, b) =>
+      a.type.localeCompare(b.type) ||
+      a.source.tier - b.source.tier ||
+      a.source.level - b.source.level ||
+      a.kind.localeCompare(b.kind),
+  );
 }
 
 const ceil = value => Math.ceil(Number(value) || 0);
 const round2 = value => Math.round((Number(value) || 0) * 100) / 100;
 
 export function calculateTransmutation({
-  quantity = 1, inputPrice, outputPrice, transmutationFee: fee,
-  stationFee = 0, buyMode = 'instant', sellMode = 'order', premium = true,
+  quantity = 1,
+  inputPrice,
+  outputPrice,
+  transmutationFee: fee,
+  stationFee = 0,
+  buyMode = 'instant',
+  sellMode = 'order',
+  premium = true,
 }) {
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
   const buy = Number(inputPrice);
@@ -97,9 +116,18 @@ export function calculateTransmutation({
   const profit = round2(netRevenue - totalCosts);
 
   return {
-    quantity: qty, inputCost, buyOrderFee, transmutationCost, stationCost,
-    grossRevenue, salesTax, sellOrderFee, netRevenue, totalCosts, profit,
+    quantity: qty,
+    inputCost,
+    buyOrderFee,
+    transmutationCost,
+    stationCost,
+    grossRevenue,
+    salesTax,
+    sellOrderFee,
+    netRevenue,
+    totalCosts,
+    profit,
     profitPerUnit: round2(profit / qty),
-    roi: totalCosts > 0 ? round2(profit / totalCosts * 100) : 0,
+    roi: totalCosts > 0 ? round2((profit / totalCosts) * 100) : 0,
   };
 }

@@ -26,9 +26,15 @@ function compute(input, premium) {
     }
     const netQty = Math.max(0, grossQty - expected);
     return {
-      id: resource.id, es: resource.es, qtyPerRun,
-      grossQty: round2(grossQty), expected: round2(expected), netQty: round2(netQty),
-      price, grossCost: round2(grossQty * price), netCost: round2(netQty * price),
+      id: resource.id,
+      es: resource.es,
+      qtyPerRun,
+      grossQty: round2(grossQty),
+      expected: round2(expected),
+      netQty: round2(netQty),
+      price,
+      grossCost: round2(grossQty * price),
+      netCost: round2(netQty * price),
       ret: resource.ret !== false,
     };
   });
@@ -42,9 +48,10 @@ function compute(input, premium) {
   const itemValue = Math.max(0, Number(input.itemValue) || 0);
   const nutritionPerRun = itemValue * TAX.nutritionPerItemValue;
   const nutritionTotal = nutritionPerRun * runs;
-  const stationFee = station.mode === 'fixed'
-    ? ceil(station.fixed)
-    : ceil((Math.max(0, Number(station.feePer100) || 0) * nutritionTotal) / 100);
+  const stationFee =
+    station.mode === 'fixed'
+      ? ceil(station.fixed)
+      : ceil((Math.max(0, Number(station.feePer100) || 0) * nutritionTotal) / 100);
 
   const buyOrderFee = input.buyMode === 'order' && input.buyOrderFee ? ceil(netMaterials * TAX.setup) : 0;
 
@@ -57,10 +64,17 @@ function compute(input, premium) {
     const totalFame = famePerRun * runs;
     const required = Math.ceil(totalFame / maxFame);
     const full = Math.floor(totalFame / maxFame);
-    const partialPct = (totalFame % maxFame) / maxFame * 100;
+    const partialPct = ((totalFame % maxFame) / maxFame) * 100;
     journalCost = round2(required * Math.max(0, Number(input.journal.emptyPrice) || 0));
     journalRevenue = round2(full * Math.max(0, Number(input.journal.fullPrice) || 0));
-    journal = { totalFame: round2(totalFame), required, full, partialPct: round2(partialPct), cost: journalCost, revenue: journalRevenue };
+    journal = {
+      totalFame: round2(totalFame),
+      required,
+      full,
+      partialPct: round2(partialPct),
+      cost: journalCost,
+      revenue: journalRevenue,
+    };
   }
 
   const otherCosts = Math.max(0, Number(input.otherCosts) || 0);
@@ -74,19 +88,47 @@ function compute(input, premium) {
   const setupFee = input.sellMode === 'order' ? ceil(grossRevenue * TAX.setup) * (1 + relists) : 0;
   const salesRevenueNet = round2(grossRevenue - salesTax - setupFee);
   const profit = round2(salesRevenueNet + journalRevenue - totalCosts);
-  const roi = totalCosts > 0 ? round2(profit / totalCosts * 100) : 0;
+  const roi = totalCosts > 0 ? round2((profit / totalCosts) * 100) : 0;
   const profitPerItem = outputQty > 0 ? round2(profit / outputQty) : 0;
   const taxMultiplier = 1 - salesTaxRate - (input.sellMode === 'order' ? TAX.setup * (1 + relists) : 0);
-  const breakEven = outputQty > 0 && taxMultiplier > 0
-    ? round2((totalCosts - journalRevenue) / outputQty / taxMultiplier) : null;
+  const breakEven =
+    outputQty > 0 && taxMultiplier > 0
+      ? round2((totalCosts - journalRevenue) / outputQty / taxMultiplier)
+      : null;
 
   return {
-    premium, runs, amount, outputQty, rrrPct: rrr * 100, resources,
-    grossMaterials, netMaterials, returnedValue, nonReturnable,
-    itemValue, nutritionPerRun: round2(nutritionPerRun), nutritionTotal: round2(nutritionTotal),
-    stationFee, buyOrderFee, journal, journalCost, journalRevenue, otherCosts, totalCosts,
-    sellPrice, grossRevenue, salesTaxRate, salesTax, setupFee, relists, salesRevenueNet,
-    profit, roi, profitPerItem, breakEven, taxMultiplier,
+    premium,
+    runs,
+    amount,
+    outputQty,
+    rrrPct: rrr * 100,
+    resources,
+    grossMaterials,
+    netMaterials,
+    returnedValue,
+    nonReturnable,
+    itemValue,
+    nutritionPerRun: round2(nutritionPerRun),
+    nutritionTotal: round2(nutritionTotal),
+    stationFee,
+    buyOrderFee,
+    journal,
+    journalCost,
+    journalRevenue,
+    otherCosts,
+    totalCosts,
+    sellPrice,
+    grossRevenue,
+    salesTaxRate,
+    salesTax,
+    setupFee,
+    relists,
+    salesRevenueNet,
+    profit,
+    roi,
+    profitPerItem,
+    breakEven,
+    taxMultiplier,
   };
 }
 
@@ -95,8 +137,10 @@ export function calculate(input) {
   const yes = compute(input, true);
   const no = compute(input, false);
   result.premiumComparison = {
-    withPremium: yes.profit, withoutPremium: no.profit,
-    delta: round2(yes.profit - no.profit), taxSaved: round2(no.salesTax - yes.salesTax),
+    withPremium: yes.profit,
+    withoutPremium: no.profit,
+    delta: round2(yes.profit - no.profit),
+    taxSaved: round2(no.salesTax - yes.salesTax),
   };
   return result;
 }
@@ -116,20 +160,41 @@ function computeFlip(input, premium) {
   const setupFee = input.sellMode === 'order' ? ceil(grossRevenue * TAX.setup) * (1 + relists) : 0;
   const salesRevenueNet = round2(grossRevenue - salesTax - setupFee);
   const profit = round2(salesRevenueNet - totalCosts);
-  const roi = totalCosts > 0 ? round2(profit / totalCosts * 100) : 0;
-  const margin = grossRevenue > 0 ? round2(profit / grossRevenue * 100) : 0;
+  const roi = totalCosts > 0 ? round2((profit / totalCosts) * 100) : 0;
+  const margin = grossRevenue > 0 ? round2((profit / grossRevenue) * 100) : 0;
   const taxMultiplier = 1 - salesTaxRate - (input.sellMode === 'order' ? TAX.setup * (1 + relists) : 0);
   const breakEven = qty > 0 && taxMultiplier > 0 ? round2(totalCosts / qty / taxMultiplier) : null;
-  return { qty, buyPrice, sellPrice, buyCost, buyOrderFee, transport, totalCosts, grossRevenue,
-    salesTaxRate, salesTax, setupFee, salesRevenueNet, profit, roi, margin, breakEven, premium };
+  return {
+    qty,
+    buyPrice,
+    sellPrice,
+    buyCost,
+    buyOrderFee,
+    transport,
+    totalCosts,
+    grossRevenue,
+    salesTaxRate,
+    salesTax,
+    setupFee,
+    salesRevenueNet,
+    profit,
+    roi,
+    margin,
+    breakEven,
+    premium,
+  };
 }
 
 export function calculateFlip(input) {
   const result = computeFlip(input, !!input.premium);
   const yes = computeFlip(input, true);
   const no = computeFlip(input, false);
-  result.premiumComparison = { withPremium: yes.profit, withoutPremium: no.profit,
-    delta: round2(yes.profit - no.profit), taxSaved: round2(no.salesTax - yes.salesTax) };
+  result.premiumComparison = {
+    withPremium: yes.profit,
+    withoutPremium: no.profit,
+    delta: round2(yes.profit - no.profit),
+    taxSaved: round2(no.salesTax - yes.salesTax),
+  };
   return result;
 }
 

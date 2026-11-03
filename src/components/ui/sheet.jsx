@@ -14,8 +14,13 @@ export function SheetContent({ className, children, ...props }) {
       <Dialog.Overlay className="sheet-overlay" />
       <Dialog.Content className={cn('sheet-content', className)} aria-describedby={undefined} {...props}>
         {children}
-        <Dialog.Close className="ui-btn ui-btn-ghost ui-btn-icon" aria-label="Cerrar menú"
-          style={{ position: 'absolute', top: 10, right: 10 }}><X size={16} /></Dialog.Close>
+        <Dialog.Close
+          className="ui-btn ui-btn-ghost ui-btn-icon"
+          aria-label="Cerrar menú"
+          style={{ position: 'absolute', top: 10, right: 10 }}
+        >
+          <X size={16} />
+        </Dialog.Close>
       </Dialog.Content>
     </Dialog.Portal>
   );

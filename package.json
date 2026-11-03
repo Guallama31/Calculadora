@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:coverage": "vitest run --coverage",
-    "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"tests/**/*.{js,jsx}\" \"tools/**/*.mjs\" \"*.{js,json,html}\""
+    "format:check": "prettier --check .",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"tests/**/*.{js,jsx}\" \"tools/**/*.mjs\" \"*.{js,json,html,md}\""
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

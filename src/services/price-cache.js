@@ -83,8 +83,10 @@ function mergeObservation(previous, incoming, receivedAt) {
     }
   }
   merged.key = priceCacheKey({
-    server: incoming.server, itemId: incoming.item_id,
-    city: incoming.city, quality: incoming.quality,
+    server: incoming.server,
+    itemId: incoming.item_id,
+    city: incoming.city,
+    quality: incoming.quality,
   });
   merged.server = incoming.server;
   merged.cached_at = Math.max(merged.buy_fetched_at || 0, merged.sell_fetched_at || 0);
@@ -92,8 +94,10 @@ function mergeObservation(previous, incoming, receivedAt) {
 }
 
 export async function writePriceRows(server, rows, receivedAt = Date.now()) {
-  const validRows = (rows || []).filter(row => row?.item_id && row?.city && row.quality != null
-    && (validQuote(row, 'buy') || validQuote(row, 'sell')));
+  const validRows = (rows || []).filter(
+    row =>
+      row?.item_id && row?.city && row.quality != null && (validQuote(row, 'buy') || validQuote(row, 'sell')),
+  );
   if (!validRows.length) return 0;
   const database = await openDatabase();
   const failed = [];
@@ -107,7 +111,10 @@ export async function writePriceRows(server, rows, receivedAt = Date.now()) {
       validRows.forEach(row => {
         const incoming = { ...row, server };
         const key = priceCacheKey({
-          server, itemId: incoming.item_id, city: incoming.city, quality: incoming.quality,
+          server,
+          itemId: incoming.item_id,
+          city: incoming.city,
+          quality: incoming.quality,
         });
         try {
           const request = store.get(key);
@@ -116,7 +123,11 @@ export async function writePriceRows(server, rows, receivedAt = Date.now()) {
               const put = store.put(mergeObservation(request.result, incoming, receivedAt));
               /* Una fila inválida no debe tumbar el lote completo: se descarta
                  esa fila y la transacción sigue viva. */
-              put.onerror = event => { event.preventDefault?.(); event.stopPropagation?.(); failRow(row); };
+              put.onerror = event => {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                failRow(row);
+              };
             } catch {
               failRow(row);
             }
@@ -131,8 +142,10 @@ export async function writePriceRows(server, rows, receivedAt = Date.now()) {
         }
       });
       transaction.oncomplete = resolve;
-      transaction.onerror = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
-      transaction.onabort = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
+      transaction.onerror = () =>
+        reject(transaction.error || new Error('No se pudo guardar la caché local.'));
+      transaction.onabort = () =>
+        reject(transaction.error || new Error('No se pudo guardar la caché local.'));
     });
   } catch (error) {
     /* Conexión cerrada por otra pestaña o base invalidada: se descarta para
@@ -151,9 +164,13 @@ export async function writePriceRows(server, rows, receivedAt = Date.now()) {
 export async function readPriceRows({ server, ids, cities, qualities }) {
   const database = await openDatabase();
   const keys = [];
-  [...new Set(ids)].forEach(itemId => [...new Set(cities)].forEach(city => [...new Set(qualities)].forEach(quality => {
-    keys.push(priceCacheKey({ server, itemId, city, quality }));
-  })));
+  [...new Set(ids)].forEach(itemId =>
+    [...new Set(cities)].forEach(city =>
+      [...new Set(qualities)].forEach(quality => {
+        keys.push(priceCacheKey({ server, itemId, city, quality }));
+      }),
+    ),
+  );
   if (!keys.length) return [];
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readonly');

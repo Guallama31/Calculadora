@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   verificar:
-    name: Lint, sintaxis, tests y build
+    name: Formato, lint, sintaxis, tests y build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,9 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Formato (Prettier)
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint

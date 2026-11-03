@@ -13,21 +13,35 @@ const mountFilter = entry => entry.categoryId === 'mounts' || /^T[0-9]_MOUNT/.te
 
 export default function MountsView({ meta }) {
   const { pending } = useApp();
-  const [tab, setTab] = React.useState(() => pending?.itemId || pending?.opportunity
-    ? 'saddling' : 'breeding');
+  const [tab, setTab] = React.useState(() =>
+    pending?.itemId || pending?.opportunity ? 'saddling' : 'breeding',
+  );
   const Icon = MODULE_ICONS.mounts;
 
   return (
     <div className="module-view" data-module="mounts">
       <div className="module-head">
-        <div><h1><Icon className="size-5" />{meta?.label}</h1><p>{meta?.description}</p></div>
+        <div>
+          <h1>
+            <Icon className="size-5" />
+            {meta?.label}
+          </h1>
+          <p>{meta?.description}</p>
+        </div>
         <span className="module-badge">{meta?.group}</span>
       </div>
       <Tabs id="mounts-flow-tabs" tabs={TABS} active={tab} onChange={setTab} />
-      {tab === 'breeding'
-        ? <BreedingView />
-        : <CalculatorView moduleId="mounts" scopeLabel="Monturas" filter={mountFilter}
-          meta={meta} showModuleHead={false} />}
+      {tab === 'breeding' ? (
+        <BreedingView />
+      ) : (
+        <CalculatorView
+          moduleId="mounts"
+          scopeLabel="Monturas"
+          filter={mountFilter}
+          meta={meta}
+          showModuleHead={false}
+        />
+      )}
     </div>
   );
 }

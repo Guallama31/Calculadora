@@ -33,11 +33,13 @@ export class ErrorBoundary extends React.Component {
           <h2>{title}</h2>
           <p className="error-boundary-reason">{error.message || String(error)}</p>
           <p className="hint">
-            {description
-              || 'El resto de la aplicación sigue disponible. Podés reintentar este módulo o recargar la página.'}
+            {description ||
+              'El resto de la aplicación sigue disponible. Podés reintentar este módulo o recargar la página.'}
           </p>
           <div className="error-boundary-actions">
-            <button type="button" className="btn primary" onClick={this.retry}>Reintentar</button>
+            <button type="button" className="btn primary" onClick={this.retry}>
+              Reintentar
+            </button>
             <button type="button" className="btn ghost" onClick={() => window.location.reload()}>
               Recargar la página
             </button>

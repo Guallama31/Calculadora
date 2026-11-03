@@ -29,9 +29,17 @@ describe('monturas: crianza', () => {
     };
     const food = { nutrition: 60 };
     const result = calculateBreeding({
-      animal, food, quantity: 2, foodUnitsPerAnimal: 3,
-      babyPrice: 100, foodPrice: 10, grownPrice: 1000, offspringPrice: 200,
-      buyMode: 'order', sellMode: 'order', premium: true,
+      animal,
+      food,
+      quantity: 2,
+      foodUnitsPerAnimal: 3,
+      babyPrice: 100,
+      foodPrice: 10,
+      grownPrice: 1000,
+      offspringPrice: 200,
+      buyMode: 'order',
+      sellMode: 'order',
+      premium: true,
     });
 
     expect(result.expectedOffspring).toBe(1);
@@ -46,13 +54,23 @@ describe('monturas: crianza', () => {
   it('no cuenta las crías retenidas como ganancia realizada', () => {
     const result = calculateBreeding({
       animal: {
-        growTime: 86400, secondsPerNutrition: 60, offspringChance: 0.5,
-        offspringAmount: 1, silverCost: 100,
+        growTime: 86400,
+        secondsPerNutrition: 60,
+        offspringChance: 0.5,
+        offspringAmount: 1,
+        silverCost: 100,
       },
       food: { nutrition: 60 },
-      quantity: 2, foodUnitsPerAnimal: 3,
-      babyPrice: 100, foodPrice: 10, grownPrice: 1000, offspringPrice: 200,
-      buyMode: 'order', sellMode: 'order', offspringMode: 'keep', premium: true,
+      quantity: 2,
+      foodUnitsPerAnimal: 3,
+      babyPrice: 100,
+      foodPrice: 10,
+      grownPrice: 1000,
+      offspringPrice: 200,
+      buyMode: 'order',
+      sellMode: 'order',
+      offspringMode: 'keep',
+      premium: true,
     });
 
     expect(result.retainedOffspringValue).toBe(200);

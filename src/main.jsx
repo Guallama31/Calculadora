@@ -37,7 +37,9 @@ async function bootstrap() {
         title="La aplicación falló"
         description="Se produjo un error inesperado fuera de un módulo. Recargá la página para volver a empezar."
       >
-        <AppProvider><App /></AppProvider>
+        <AppProvider>
+          <App />
+        </AppProvider>
       </ErrorBoundary>,
     );
   } catch (error) {

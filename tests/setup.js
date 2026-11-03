@@ -14,7 +14,9 @@ if (typeof globalThis.localStorage === 'undefined') {
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
-      get length() { return values.size; },
+      get length() {
+        return values.size;
+      },
       clear: () => values.clear(),
       getItem: key => values.get(String(key)) ?? null,
       key: index => [...values.keys()][index] ?? null,

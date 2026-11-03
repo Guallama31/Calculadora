@@ -9,7 +9,9 @@ const valid = id => moduleIds.includes(id);
 
 export function AppProvider({ children }) {
   const [prefs, setPrefsState] = React.useState(() => ({ ...DEFAULTS, ...loadPrefs() }));
-  const [active, setActive] = React.useState(() => valid(location.hash.slice(1)) ? location.hash.slice(1) : 'crafting');
+  const [active, setActive] = React.useState(() =>
+    valid(location.hash.slice(1)) ? location.hash.slice(1) : 'crafting',
+  );
   const [pending, setPending] = React.useState({ seq: 0 });
 
   const setPrefs = React.useCallback(patch => {
@@ -33,20 +35,40 @@ export function AppProvider({ children }) {
   React.useEffect(() => {
     const onPop = () => {
       const id = location.hash.slice(1);
-      if (valid(id)) { setActive(id); setPending({ seq: 0 }); }
+      if (valid(id)) {
+        setActive(id);
+        setPending({ seq: 0 });
+      }
     };
     window.addEventListener('hashchange', onPop);
     window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('hashchange', onPop); window.removeEventListener('popstate', onPop); };
+    return () => {
+      window.removeEventListener('hashchange', onPop);
+      window.removeEventListener('popstate', onPop);
+    };
   }, []);
 
-  const shared = React.useMemo(() => ({
-    server: prefs.server, quality: Number(prefs.quality), premium: prefs.premium !== false,
-  }), [prefs.server, prefs.quality, prefs.premium]);
+  const shared = React.useMemo(
+    () => ({
+      server: prefs.server,
+      quality: Number(prefs.quality),
+      premium: prefs.premium !== false,
+    }),
+    [prefs.server, prefs.quality, prefs.premium],
+  );
 
-  const value = React.useMemo(() => ({
-    prefs, setPrefs, shared, setShared, active, pending, navigate,
-  }), [prefs, setPrefs, shared, setShared, active, pending, navigate]);
+  const value = React.useMemo(
+    () => ({
+      prefs,
+      setPrefs,
+      shared,
+      setShared,
+      active,
+      pending,
+      navigate,
+    }),
+    [prefs, setPrefs, shared, setShared, active, pending, navigate],
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

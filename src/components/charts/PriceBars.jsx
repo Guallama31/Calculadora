@@ -5,11 +5,15 @@ export function PriceBars({ rows, label = 'Precio' }) {
   const max = Math.max(...rows.map(r => r.price), 1);
   return (
     <div className="price-bars">
-      <div className="chart-title">{label} <span>plata / unidad</span></div>
+      <div className="chart-title">
+        {label} <span>plata / unidad</span>
+      </div>
       {rows.map(r => (
         <div className="bar-row" key={r.city}>
           <span className="bar-label">{esc(r.city)}</span>
-          <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(2, r.price / max * 100)}%` }} /></div>
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: `${Math.max(2, (r.price / max) * 100)}%` }} />
+          </div>
           <span className="bar-value">{fmt(r.price)}</span>
         </div>
       ))}
@@ -26,8 +30,10 @@ export function ProfitBars({ rows }) {
         <div className="bar-row" key={r.city}>
           <span className="bar-label">{esc(r.city)}</span>
           <div className="bar-track">
-            <div className={`bar-fill ${r.profit >= 0 ? 'good' : 'bad'}`}
-              style={{ width: `${Math.max(2, Math.abs(r.profit) / max * 100)}%` }} />
+            <div
+              className={`bar-fill ${r.profit >= 0 ? 'good' : 'bad'}`}
+              style={{ width: `${Math.max(2, (Math.abs(r.profit) / max) * 100)}%` }}
+            />
           </div>
           <span className={`bar-value ${r.profit >= 0 ? 'positive' : 'negative'}`}>{fmt(r.profit)}</span>
         </div>

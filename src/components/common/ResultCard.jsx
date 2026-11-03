@@ -9,5 +9,11 @@ export function ResultCard({ id, label, value = '0', tone = '', sub = '' }) {
   );
 }
 export function ResultGrid({ cards, className }) {
-  return <div className={cn('result-grid', className)}>{cards.map((c, i) => <ResultCard key={c.id || i} {...c} />)}</div>;
+  return (
+    <div className={cn('result-grid', className)}>
+      {cards.map((c, i) => (
+        <ResultCard key={c.id || i} {...c} />
+      ))}
+    </div>
+  );
 }

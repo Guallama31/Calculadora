@@ -6,10 +6,26 @@ import { classifyItem } from '../src/services/item-taxonomy.js';
 describe('Taxonomía del catálogo', () => {
   it('ofrece las 20 categorías de navegación y la categoría técnica de excepciones', () => {
     expect(CATEGORIES.filter(category => category.value).map(category => category.value)).toEqual([
-      'weapons', 'offhands', 'head-armor', 'chest-armor', 'foot-armor', 'accessories',
-      'mounts', 'consumables', 'raw-resources', 'refined-materials', 'farming', 'fishing',
-      'gathering-gear-tools', 'crafting-alchemy-materials', 'artifacts', 'journals-laborers',
-      'furniture-housing', 'treasures-luxury-goods', 'vanity-cosmetics', 'loot-tokens-other',
+      'weapons',
+      'offhands',
+      'head-armor',
+      'chest-armor',
+      'foot-armor',
+      'accessories',
+      'mounts',
+      'consumables',
+      'raw-resources',
+      'refined-materials',
+      'farming',
+      'fishing',
+      'gathering-gear-tools',
+      'crafting-alchemy-materials',
+      'artifacts',
+      'journals-laborers',
+      'furniture-housing',
+      'treasures-luxury-goods',
+      'vanity-cosmetics',
+      'loot-tokens-other',
       'unclassified',
     ]);
   });
@@ -57,14 +73,21 @@ describe('Taxonomía del catálogo', () => {
 
   it('incluye refinados encantados con IDs de mercado y recetas de materiales del mismo encantamiento', () => {
     expect(get('T4_PLANKS_LEVEL1@1')).toMatchObject({
-      base: 'T4_PLANKS', lvl: 1, tier: 4, refine: true, ccat: 'wood',
+      base: 'T4_PLANKS',
+      lvl: 1,
+      tier: 4,
+      refine: true,
+      ccat: 'wood',
     });
     expect(get('T4_PLANKS_LEVEL1@1').res).toEqual([
       expect.objectContaining({ id: 'T4_WOOD_LEVEL1@1', q: 2 }),
       expect.objectContaining({ id: 'T3_PLANKS', q: 1 }),
     ]);
     expect(get('T5_METALBAR_LEVEL2@2')).toMatchObject({
-      base: 'T5_METALBAR', lvl: 2, refine: true, ccat: 'ore',
+      base: 'T5_METALBAR',
+      lvl: 2,
+      refine: true,
+      ccat: 'ore',
     });
     expect(variants('T4_PLANKS').map(entry => entry.lvl)).toEqual([0, 1, 2, 3, 4]);
     expect(variants('T4_STONEBLOCK').map(entry => entry.lvl)).toEqual([0]);

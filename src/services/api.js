@@ -1,7 +1,11 @@
 /* Cliente del Albion Online Data Project (precios por ciudad). */
 import { CITIES } from '../settings/index.js';
 import {
-  clearPriceCache, getPriceCacheCount, prunePriceCache, readPriceRows, writePriceRows,
+  clearPriceCache,
+  getPriceCacheCount,
+  prunePriceCache,
+  readPriceRows,
+  writePriceRows,
 } from './price-cache.js';
 export { CITIES };
 export const SERVER_LABELS = { west: 'Américas (West)', east: 'Asia (East)', europe: 'Europa' };
@@ -61,20 +65,20 @@ function validQuote(row, mode) {
   const price = Number(mode === 'buy' ? row?.buy_price_max : row?.sell_price_min);
   const date = mode === 'buy' ? row?.buy_price_max_date : row?.sell_price_min_date;
   const timestamp = date ? Date.parse(date) : NaN;
-  return Number.isFinite(price) && price > 0 && Number.isFinite(timestamp)
-    ? { price, date }
-    : null;
+  return Number.isFinite(price) && price > 0 && Number.isFinite(timestamp) ? { price, date } : null;
 }
 
 function quoteFields(mode) {
-  return mode === 'buy'
-    ? ['buy_price_max', 'buy_price_max_date']
-    : ['sell_price_min', 'sell_price_min_date'];
+  return mode === 'buy' ? ['buy_price_max', 'buy_price_max_date'] : ['sell_price_min', 'sell_price_min_date'];
 }
 
 export function chunkPriceIds({
-  server = 'west', ids = [], cities = [], quality = 1,
-  maxIds = DEFAULT_MAX_IDS, maxUrlLength = DEFAULT_MAX_URL_LENGTH,
+  server = 'west',
+  ids = [],
+  cities = [],
+  quality = 1,
+  maxIds = DEFAULT_MAX_IDS,
+  maxUrlLength = DEFAULT_MAX_URL_LENGTH,
 } = {}) {
   const host = HOSTS[server];
   if (!host) throw new Error(`Servidor de precios no válido: ${server}.`);
@@ -103,14 +107,21 @@ function friendlyError(response) {
   if (response.status === 429) {
     const reset = response.headers.get('RateLimit-Reset');
     const seconds = reset ? Math.max(0, Math.ceil(Number(reset) - Date.now() / 1000)) : null;
-    return new Error(`Límite de peticiones alcanzado (429).${seconds ? ` Reintentá en ${seconds} s.` : ' Esperá antes de reintentar.'}`);
+    return new Error(
+      `Límite de peticiones alcanzado (429).${seconds ? ` Reintentá en ${seconds} s.` : ' Esperá antes de reintentar.'}`,
+    );
   }
   return new Error(`La API respondió HTTP ${response.status}.`);
 }
 
 export async function fetchPrices({
-  server = 'west', ids = [], cities = [], quality = 1, onRequest,
-  signal = null, timeoutMs = PRICE_REQUEST_TIMEOUT_MS,
+  server = 'west',
+  ids = [],
+  cities = [],
+  quality = 1,
+  onRequest,
+  signal = null,
+  timeoutMs = PRICE_REQUEST_TIMEOUT_MS,
 }) {
   if (!ids.length || !cities.length) return [];
   if (!HOSTS[server]) throw new Error(`Servidor de precios no válido: ${server}.`);
@@ -125,7 +136,8 @@ export async function fetchPrices({
   const request = (async () => {
     try {
       const res = await fetch(HOSTS[server] + path, {
-        headers: { Accept: 'application/json' }, cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
         signal: mergeSignals([signal, timeoutSignal(timeoutMs)]),
       });
       if (!res.ok) throw friendlyError(res);
@@ -138,7 +150,9 @@ export async function fetchPrices({
         }
         await writePriceRows(server, rows);
       } catch (cacheError) {
-        rows.forEach(row => { row.__cacheWarning = cacheError.message; });
+        rows.forEach(row => {
+          row.__cacheWarning = cacheError.message;
+        });
       }
       return rows;
     } catch (thrown) {
@@ -147,7 +161,9 @@ export async function fetchPrices({
       if (signal?.aborted && thrown?.name !== 'TimeoutError') throw cancelError();
       let error = thrown;
       if (error?.name === 'TimeoutError') {
-        error = new Error(`AODP no respondió en ${Math.max(1, Math.round(Number(timeoutMs) / 1000))} s. Se usará la caché local si hay datos.`);
+        error = new Error(
+          `AODP no respondió en ${Math.max(1, Math.round(Number(timeoutMs) / 1000))} s. Se usará la caché local si hay datos.`,
+        );
       } else if (error instanceof TypeError || error?.name === 'TypeError') {
         error = new Error('No se pudo contactar con AODP. Revisá tu conexión e intentá nuevamente.');
       }
@@ -156,10 +172,15 @@ export async function fetchPrices({
           server,
           ids,
           cities,
-          qualities: String(quality).split(',').map(value => Number(value.trim())).filter(Number.isFinite),
+          qualities: String(quality)
+            .split(',')
+            .map(value => Number(value.trim()))
+            .filter(Number.isFinite),
         });
         if (cachedRows.length) {
-          cachedRows.forEach(row => { row.__cacheFallbackError = error.message; });
+          cachedRows.forEach(row => {
+            row.__cacheFallbackError = error.message;
+          });
           return cachedRows;
         }
       } catch (cacheError) {
@@ -173,7 +194,9 @@ export async function fetchPrices({
      de inmediato: `abort()` es síncrono y la siguiente consulta (mismo ítem y
      ciudades) se encontraría con la promesa vieja a punto de rechazarse. */
   const forget = signal
-    ? () => { if (inFlight.get(key) === request) inFlight.delete(key); }
+    ? () => {
+        if (inFlight.get(key) === request) inFlight.delete(key);
+      }
     : null;
   if (forget) {
     if (signal.aborted) forget();
@@ -213,7 +236,9 @@ export function priceFor(row, mode) {
   const quote = validQuote(row, mode);
   if (!quote) return null;
   return {
-    ...quote, city: row.city, source: row.__priceSource || 'aodp',
+    ...quote,
+    city: row.city,
+    source: row.__priceSource || 'aodp',
     fetchedAt: mode === 'buy' ? row.buy_fetched_at || row.cached_at : row.sell_fetched_at || row.cached_at,
     row,
   };
@@ -235,16 +260,18 @@ export function quoteCoverage(map, ids, cities, quality) {
   const uniqueCities = [...new Set(cities)].filter(Boolean);
   const requested = uniqueIds.length * uniqueCities.length * 2;
   let quoted = 0;
-  uniqueIds.forEach(id => uniqueCities.forEach(city => {
-    const row = pick(map, id, city, quality);
-    if (priceFor(row, 'buy')) quoted += 1;
-    if (priceFor(row, 'sell')) quoted += 1;
-  }));
+  uniqueIds.forEach(id =>
+    uniqueCities.forEach(city => {
+      const row = pick(map, id, city, quality);
+      if (priceFor(row, 'buy')) quoted += 1;
+      if (priceFor(row, 'sell')) quoted += 1;
+    }),
+  );
   return {
     requested,
     quoted,
     missing: requested - quoted,
-    percent: requested ? quoted / requested * 100 : null,
+    percent: requested ? (quoted / requested) * 100 : null,
   };
 }
 
@@ -257,7 +284,9 @@ export function cacheNotice(rows) {
     cached ? 'Se usaron cotizaciones anteriores de la caché local; revisá sus fechas.' : '',
     cacheError ? `AODP no respondió (${cacheError}).` : '',
     warning ? `No se pudo actualizar la caché local: ${warning}` : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export { clearPriceCache, getPriceCacheCount };

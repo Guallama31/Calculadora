@@ -3,13 +3,19 @@ import { calculate, calculateFlip } from '../src/services/engine.js';
 
 const item = { id: 'T4_BAG', es: 'Bolsa', amount: 1, value: 100 };
 const baseInput = {
-  item, runs: 1, rrrPct: 0, itemValue: 100,
+  item,
+  runs: 1,
+  rrrPct: 0,
+  itemValue: 100,
   station: { mode: 'fixed', fixed: 0 },
   resources: [
     { id: 'T4_CLOTH', es: 'Tela', q: 8, price: 100 },
     { id: 'T4_LEATHER', es: 'Cuero', q: 8, price: 100 },
   ],
-  buyMode: 'instant', sellMode: 'instant', sellPrice: 0, premium: true,
+  buyMode: 'instant',
+  sellMode: 'instant',
+  sellPrice: 0,
+  premium: true,
 };
 
 describe('motor de crafteo', () => {
@@ -39,7 +45,8 @@ describe('motor de crafteo', () => {
 
   it('convierte la nutrición en tasa de estación y la redondea hacia arriba', () => {
     const result = calculate({
-      ...baseInput, itemValue: 1000,
+      ...baseInput,
+      itemValue: 1000,
       station: { mode: 'nutrition', feePer100: 3 },
     });
     expect(result.nutritionPerRun).toBe(112.5);
@@ -48,7 +55,8 @@ describe('motor de crafteo', () => {
 
   it('calcula diarios completos e incompletos sin regalar plata', () => {
     const result = calculate({
-      ...baseInput, runs: 20,
+      ...baseInput,
+      runs: 20,
       resources: [{ id: 'T4_CLOTH', q: 1, price: 10 }],
       journal: { enabled: true, fame: 48, max: 900, emptyPrice: 100, fullPrice: 1000 },
       sellPrice: 0,
@@ -62,7 +70,10 @@ describe('motor de crafteo', () => {
 
   it('cobra la tarifa de orden por cada republicación', () => {
     const result = calculate({
-      ...baseInput, sellPrice: 100, sellMode: 'order', relists: 2,
+      ...baseInput,
+      sellPrice: 100,
+      sellMode: 'order',
+      relists: 2,
     });
     expect(result.setupFee).toBe(3 * Math.ceil(100 * 0.025));
     expect(result.salesTax).toBe(Math.ceil(100 * 0.04));
@@ -71,8 +82,7 @@ describe('motor de crafteo', () => {
 
   it('calcula el precio de equilibrio descontando impuestos y diarios', () => {
     const result = calculate({ ...baseInput, sellPrice: 200, sellMode: 'order', relists: 0 });
-    const expected = (result.totalCosts - result.journalRevenue) / result.outputQty
-      / (1 - 0.04 - 0.025);
+    const expected = (result.totalCosts - result.journalRevenue) / result.outputQty / (1 - 0.04 - 0.025);
     expect(result.breakEven).toBe(Math.round(expected * 100) / 100);
   });
 
@@ -86,7 +96,10 @@ describe('motor de crafteo', () => {
 
   it('no divide por cero cuando no hay costos ni ventas', () => {
     const result = calculate({
-      ...baseInput, resources: [], station: { mode: 'fixed', fixed: 0 }, sellPrice: 0,
+      ...baseInput,
+      resources: [],
+      station: { mode: 'fixed', fixed: 0 },
+      sellPrice: 0,
     });
     expect(result.totalCosts).toBe(0);
     expect(result.roi).toBe(0);
@@ -98,8 +111,12 @@ describe('motor de crafteo', () => {
 describe('motor de flipping', () => {
   it('descuenta impuesto de venta y calcula ROI, margen y equilibrio', () => {
     const result = calculateFlip({
-      qty: 10, buyPrice: 100, sellPrice: 150, buyMode: 'instant',
-      sellMode: 'instant', premium: true,
+      qty: 10,
+      buyPrice: 100,
+      sellPrice: 150,
+      buyMode: 'instant',
+      sellMode: 'instant',
+      premium: true,
     });
     expect(result.grossRevenue).toBe(1500);
     expect(result.salesTax).toBe(60);
@@ -111,8 +128,13 @@ describe('motor de flipping', () => {
 
   it('suma la tarifa de orden de compra y el transporte', () => {
     const result = calculateFlip({
-      qty: 10, buyPrice: 100, sellPrice: 150, buyMode: 'order',
-      sellMode: 'order', premium: false, transport: 50,
+      qty: 10,
+      buyPrice: 100,
+      sellPrice: 150,
+      buyMode: 'order',
+      sellMode: 'order',
+      premium: false,
+      transport: 50,
     });
     expect(result.buyOrderFee).toBe(Math.ceil(1000 * 0.025));
     expect(result.totalCosts).toBe(1000 + 25 + 50);

@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "./main.css";
-@import "./shell.css";
+@import 'tailwindcss';
+@import './main.css';
+@import './shell.css';
 
 /* Tokens del ejemplo (shadcn) mapeados a nuestra paleta azul / dorado. */
 @theme {
