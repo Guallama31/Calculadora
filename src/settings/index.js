@@ -1,4 +1,6 @@
 /* Configuración global: servidores, ciudades, impuestos, módulos y categorías. */
+import { ITEM_CATEGORIES } from '../services/item-taxonomy.js';
+
 export const APP_NAME = 'Calculadora';
 export const STORAGE_KEY = 'calculadora-prefs-v1';
 
@@ -43,24 +45,7 @@ export const TAX = Object.freeze({
   nutritionPerItemValue: 0.1125,
 });
 
-export const CATEGORIES = [
-  { value: '', label: 'Todas las categorías' },
-  { value: 'weapons', label: 'Armas' },
-  { value: 'armors', label: 'Armaduras' },
-  { value: 'head', label: 'Cascos' },
-  { value: 'shoes', label: 'Botas' },
-  { value: 'offhands', label: 'Mano izquierda' },
-  { value: 'capes', label: 'Capas' },
-  { value: 'bags', label: 'Bolsas' },
-  { value: 'artefacts', label: 'Artefactos' },
-  { value: 'consumables', label: 'Consumibles' },
-  { value: 'gathering', label: 'Herramientas' },
-  { value: 'mounts', label: 'Monturas' },
-  { value: 'crafting', label: 'Materiales refinados' },
-  { value: 'farming', label: 'Agricultura' },
-  { value: 'other', label: 'Otros' },
-  { value: 'furniture', label: 'Mobiliario' },
-];
+export const CATEGORIES = ITEM_CATEGORIES;
 
 export const MODULES = [
   { id: 'crafting', label: 'Crafteo', icon: '⚒', group: 'Producción', description: 'Calculá la rentabilidad real de fabricar un ítem: receta, materiales, impuestos, diarios y tasa de estación.' },
@@ -68,7 +53,7 @@ export const MODULES = [
   { id: 'refining', label: 'Refinamiento', icon: '▤', group: 'Producción', description: 'Refiná recursos en la ciudad con bonus de producción y calculá la devolución por RRR.' },
   { id: 'farming', label: 'Agricultura', icon: '❀', group: 'Producción', description: 'Recetas de cultivo y productos agrícolas con precios por ciudad.' },
   { id: 'animals', label: 'Animales', icon: '❖', group: 'Producción', description: 'Calculadora de margen para cría y venta de animales con tus propios valores.' },
-  { id: 'mounts', label: 'Monturas', icon: '◈', group: 'Producción', description: 'Coste de fabricación de monturas y comparación con su precio de mercado.' },
+  { id: 'mounts', label: 'Monturas', icon: '◈', group: 'Producción', description: 'Calculá la rentabilidad de criar animales y ensillar monturas con precios de mercado.' },
   { id: 'alchemy', label: 'Alquimia', icon: '⚗', group: 'Producción', description: 'Pociones y consumibles alquímicos: recetas, impuestos y ganancia.' },
   { id: 'cooking', label: 'Cocina', icon: '◍', group: 'Producción', description: 'Comida y platos cocinados con recetas reales del juego.' },
   { id: 'flipping', label: 'Flipping', icon: '⇄', group: 'Mercado', description: 'Encontrá oportunidades: flip entre ciudades, Royal → Mercado Negro, crafteo y refinamiento.' },
@@ -81,5 +66,4 @@ export const DEFAULTS = {
   craftCity: 'Thetford', buyCity: 'Martlock', sellCity: 'Lymhurst',
   buyMode: 'instant', sellMode: 'order', rrrMode: 'auto',
   focus: false, dailyBonus: 0, stationFee: 0, syncBuyCity: true,
-  collapsed: false,
 };

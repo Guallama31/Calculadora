@@ -25,8 +25,6 @@
   --faint: #94a0b6;
   --shadow: 0 1px 2px rgba(20, 40, 80, .04), 0 6px 18px rgba(20, 40, 80, .04);
   --radius: 13px;
-  --sidebar-w: 238px;
-  --sidebar-collapsed: 72px;
   --header-h: 64px;
 }
 
@@ -83,38 +81,6 @@ input[type="checkbox"]:checked + .switch { background: var(--blue); }
 input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 
 .shell-body { display: flex; align-items: flex-start; min-height: calc(100vh - var(--header-h)); }
-.sidebar {
-  width: var(--sidebar-w); flex: none;
-  background: var(--surface); border-right: 1px solid var(--border);
-  height: calc(100vh - var(--header-h)); position: sticky; top: var(--header-h);
-  overflow-y: auto; overflow-x: hidden;
-  transition: width .2s ease;
-}
-.sidebar-inner { display: flex; flex-direction: column; justify-content: space-between; height: 100%; padding: 18px 12px 14px; }
-.nav-group { margin-bottom: 20px; }
-.nav-group-title {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .11em;
-  color: var(--faint); padding: 0 12px 9px; white-space: nowrap;
-}
-.nav-item {
-  width: 100%; display: flex; align-items: center; gap: 12px;
-  border: 0; background: transparent; color: var(--muted);
-  padding: 9px 12px; border-radius: 9px; text-align: left; font-size: 13.5px;
-  margin-bottom: 3px; white-space: nowrap; transition: background .15s, color .15s;
-}
-.nav-item:hover { background: var(--surface-alt); color: var(--blue); }
-.nav-item.active { background: var(--blue-soft); color: var(--blue-dark); font-weight: 600; box-shadow: inset 3px 0 0 var(--blue); }
-.nav-icon { width: 20px; flex: none; text-align: center; font-size: 16px; color: var(--blue); }
-.nav-item.active .nav-icon { color: var(--blue-dark); }
-.sidebar-foot { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--faint); white-space: nowrap; }
-.sidebar-foot-badge { background: var(--gold-soft); color: var(--amber); border: 1px solid var(--gold-line); border-radius: 6px; padding: 2px 6px; font-weight: 700; font-size: 10px; flex: none; }
-.shell.collapsed .sidebar { width: var(--sidebar-collapsed); }
-.shell.collapsed .nav-label, .shell.collapsed .nav-group-title { display: none; }
-.shell.collapsed .nav-item { justify-content: center; padding: 10px 0; }
-.shell.collapsed .nav-icon { width: auto; font-size: 18px; }
-.shell.collapsed .nav-item.active { box-shadow: inset 3px 0 0 var(--blue); }
-.shell.collapsed .sidebar-inner { padding: 18px 8px 14px; }
-.shell.collapsed .sidebar-foot { justify-content: center; }
 
 .main { flex: 1; min-width: 0; padding: 26px 30px 60px; max-width: 1660px; }
 .module-view { animation: fade .2s ease; }
@@ -206,6 +172,8 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 .suggestion:last-child { border-bottom: 0; }
 .suggestion:hover, .suggestion.active { background: var(--blue-soft); }
 .suggestion.muted { color: var(--muted); cursor: default; font-size: 12.5px; }
+.suggestion-more { width: 100%; padding: 8px; border: 0; background: var(--surface-alt); color: var(--blue); font-size: 12px; font-weight: 600; }
+.suggestion-more:hover { background: var(--blue-soft); }
 .suggestion img { width: 28px; height: 28px; flex: none; }
 .suggestion-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .suggestion-text strong { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -224,6 +192,8 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 .pill { background: var(--blue-soft); color: var(--blue-dark); border: 1px solid var(--blue-line); border-radius: 12px; padding: 1px 8px; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
 .pill.gold { background: var(--gold-soft); color: var(--amber); border-color: var(--gold-line); }
 .pill.blue { background: var(--blue); color: #fff; border-color: var(--blue); }
+.sale-city-choice { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sale-city-prices { margin-top: 16px; }
 
 /* --------------------------------- Tables -------------------------------- */
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 9px; }
@@ -233,6 +203,24 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 .data-table tbody tr:hover { background: #fafcff; }
 .data-table tfoot td { background: var(--gold-soft); font-weight: 700; border-top: 1px solid var(--gold-line); }
 .data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#scan-opportunities .table-scroll { overflow-x: auto; }
+#scan-opportunities .data-table { min-width: 920px; }
+#scan-opportunities .material-cell { align-items: center; gap: 10px; min-width: 0; }
+#scan-opportunities .material-cell > .opportunity-item-icon {
+  display: block; width: 60px; height: 60px; max-width: 60px; flex: 0 0 60px;
+}
+#scan-opportunities .material-cell > div { gap: 2px; }
+#scan-opportunities .material-cell strong { white-space: normal; overflow-wrap: anywhere; }
+#scan-opportunities .material-cell small { overflow-wrap: anywhere; }
+#scan-opportunities .route { min-width: 0; gap: 5px; }
+#scan-opportunities .trade-cities { display: flex; flex-wrap: wrap; gap: 5px; }
+#scan-opportunities .trade-cities span {
+  border: 1px solid var(--blue-line); border-radius: 12px; padding: 2px 8px;
+  background: var(--blue-soft); color: var(--blue-dark); font-size: 11px; font-weight: 600;
+}
+#scan-opportunities .trade-cities span + span {
+  border-color: var(--gold-line); background: var(--gold-soft); color: var(--amber);
+}
 .materials-table .material-cell { display: flex; align-items: center; gap: 8px; min-width: 155px; }
 .materials-table img { width: 26px; height: 26px; flex: none; }
 .material-cell > div { display: flex; flex-direction: column; min-width: 0; }
@@ -242,6 +230,26 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 .row-city { border: 1px solid var(--border); border-radius: 6px; background: var(--surface-alt); padding: 4px 5px; font-size: 11px; max-width: 115px; }
 .row-price { width: 92px; border: 1px solid var(--border); background: var(--surface-alt); border-radius: 6px; padding: 5px 7px; font-size: 12px; text-align: right; }
 .row-price.manual { border-color: var(--gold); background: var(--gold-soft); }
+.transmute-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin: 14px 0; }
+.transmute-controls .field { margin-bottom: 0; }
+.transmute-tax { margin-top: 12px; }
+.transmutation-view { display: flex; flex-direction: column; gap: 18px; }
+.primary-recipe-reference { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-alt); }
+.primary-recipe-reference > strong { display: block; margin-bottom: 6px; font-size: 12px; }
+.primary-recipe-reference ul { display: flex; flex-direction: column; gap: 4px; list-style: none; }
+.primary-recipe-reference li { display: flex; justify-content: space-between; gap: 12px; font-size: 11.5px; }
+.primary-recipe-reference li span { display: flex; flex-direction: column; }
+.primary-recipe-reference small { color: var(--faint); font-size: 10px; }
+.transmute-table { min-width: 1080px; }
+.transmute-item, .transmute-price { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+.transmute-item img, .transmute-price img { width: 34px; height: 34px; object-fit: contain; flex: none; }
+.transmute-item > div, .transmute-price > div { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.transmute-item strong { font-size: 12px; white-space: nowrap; }
+.transmute-item small { color: var(--faint); font-size: 10px; white-space: nowrap; }
+.transmute-price .row-price { width: 105px; }
+.transmute-price .age { white-space: nowrap; font-size: 10px; }
+.transmute-note { padding-top: 12px; }
+.transmute-note a { color: var(--blue-dark); text-decoration: underline; }
 .price-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .route { display: flex; flex-direction: column; min-width: 130px; }
 .route small { color: var(--faint); font-size: 10.5px; }
@@ -321,6 +329,52 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
   .work-grid { grid-template-columns: minmax(290px, 340px) minmax(0, 1fr); }
   .breakdown-table { grid-template-columns: 1fr; }
   .line.total { grid-column: 1; }
+  #scan-opportunities .table-scroll { overflow: visible; border: 0; }
+  #scan-opportunities .data-table { display: block; min-width: 0; }
+  #scan-opportunities .data-table thead { display: none; }
+  #scan-opportunities .data-table tbody {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    gap: 12px;
+  }
+  #scan-opportunities .data-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  #scan-opportunities .data-table tbody td {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+    padding: 9px 10px;
+    text-align: left;
+    white-space: normal;
+  }
+  #scan-opportunities .data-table tbody td::before {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  #scan-opportunities .data-table tbody td:nth-child(1),
+  #scan-opportunities .data-table tbody td:nth-child(2),
+  #scan-opportunities .data-table tbody td:nth-child(9) { grid-column: 1 / -1; }
+  #scan-opportunities .data-table tbody td:nth-child(3)::before { content: "Coste / u"; }
+  #scan-opportunities .data-table tbody td:nth-child(4)::before { content: "Venta / u"; }
+  #scan-opportunities .data-table tbody td:nth-child(5)::before { content: "Impuestos"; }
+  #scan-opportunities .data-table tbody td:nth-child(6)::before { content: "Ganancia / u"; }
+  #scan-opportunities .data-table tbody td:nth-child(7)::before { content: "ROI"; }
+  #scan-opportunities .data-table tbody td:nth-child(8)::before { content: "Edad del precio"; }
+  #scan-opportunities .data-table tbody td:nth-child(9) .btn { width: 100%; }
+  #scan-opportunities .data-table tbody td:first-child .material-cell { width: 100%; }
+  #scan-opportunities .trade-cities { gap: 6px; }
 }
 @media (max-width: 980px) {
   :root { --sidebar-w: 190px; }
@@ -332,21 +386,29 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 }
 @media (max-width: 700px) {
   .shell-body { display: block; }
-  .sidebar { width: 100%; height: auto; position: static; border-right: 0; border-bottom: 1px solid var(--border); }
-  .sidebar-inner { padding: 10px; }
-  .nav-group { margin-bottom: 8px; }
-  .nav-group-title, .sidebar-foot, .nav-label { display: none; }
-  .nav-groups { display: flex; gap: 4px; overflow-x: auto; }
-  .nav-item { width: auto; padding: 8px 11px; margin: 0; }
-  .nav-icon { width: auto; }
-  .shell.collapsed .sidebar { width: 100%; }
-  .shell.collapsed .nav-item { padding: 8px 11px; }
   .result-grid, .premium-grid { grid-template-columns: 1fr 1fr; }
   .module-head h1 { font-size: 20px; }
   .price-bars .bar-row { grid-template-columns: 90px 1fr 72px; }
+  #scan-opportunities .card-head { align-items: flex-start; flex-wrap: wrap; }
+  #scan-opportunities .card-head .hint { flex-basis: 100%; }
 }
 @media (max-width: 460px) {
   .result-grid { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
   .header-right .header-field:nth-child(2) { display: none; }
 }
+
+.mount-breeding .mount-data-note {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--blue-line);
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--muted);
+}
+.mount-price-field { min-width: 0; }
+.mount-breeding .card-head-actions { display: flex; align-items: center; gap: 8px; }
+.mount-price-status { min-height: 20px; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.mount-price-status:not(:empty) { padding-top: 8px; border-top: 1px solid var(--border); }
+.mount-price-status.loading { color: var(--blue-dark); }
+.mount-cost-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; color: var(--muted); font-size: 12px; }

@@ -12,10 +12,10 @@ export function Field({ label, children, hint, hidden, className }) {
   );
 }
 
-export function Select({ id, label, options, value, onChange, hint, hidden, className }) {
+export function Select({ id, label, options, value, onChange, hint, hidden, className, disabled = false }) {
   return (
     <Field label={label} hint={hint} hidden={hidden} className={className}>
-      <select id={id} value={value} onChange={e => onChange(e.target.value)}>
+      <select id={id} value={value} disabled={disabled} onChange={e => onChange(e.target.value)}>
         {options.map(o => {
           const val = typeof o === 'string' ? o : o.value;
           const text = typeof o === 'string' ? o : o.label;
@@ -26,10 +26,12 @@ export function Select({ id, label, options, value, onChange, hint, hidden, clas
   );
 }
 
-export function NumberField({ id, label, value, onChange, min = 0, step = 1, hint, hidden, readOnly, className }) {
+export function NumberField({ id, label, value, onChange, min = 0, step = 1, hint, hidden, readOnly,
+  disabled = false, className, placeholder }) {
   return (
     <Field label={label} hint={hint} hidden={hidden} className={className}>
-      <input id={id} type="number" value={value} min={min} step={step} readOnly={readOnly}
+      <input id={id} type="number" value={value} min={min} step={step} readOnly={readOnly} disabled={disabled}
+        placeholder={placeholder}
         onChange={e => onChange(e.target.value)} />
     </Field>
   );

@@ -1,7 +1,7 @@
 /* Respuestas simuladas de AODP para las pruebas. */
 import { vi } from 'vitest';
 
-export function installFetch({ mode = 'ok', discount = 420 } = {}) {
+export function installFetch({ mode = 'ok', discount = 420, missingCity = null, missingItem = null } = {}) {
   const now = new Date().toISOString();
   const spy = vi.fn(async (url, options) => {
     if (mode === '429') {
@@ -16,6 +16,7 @@ export function installFetch({ mode = 'ok', discount = 420 } = {}) {
     const qualities = (u.searchParams.get('qualities') || '1').split(',');
     const rows = [];
     for (const id of ids) for (const city of cities) for (const q of qualities) {
+      if (city === missingCity && (!missingItem || id === missingItem)) continue;
       let base = 1000 + id.length * 37 + city.length * 11 + Number(q) * 100;
       if (city === 'Thetford') base -= discount;
       const price = Math.max(1, Math.round(base));

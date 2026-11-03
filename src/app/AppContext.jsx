@@ -46,8 +46,6 @@ export function AppProvider({ children }) {
 
   const value = React.useMemo(() => ({
     prefs, setPrefs, shared, setShared, active, pending, navigate,
-    collapsed: !!prefs.collapsed,
-    toggleCollapse: () => setPrefs({ collapsed: !prefs.collapsed }),
   }), [prefs, setPrefs, shared, setShared, active, pending, navigate]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

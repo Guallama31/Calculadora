@@ -56,18 +56,32 @@ La **navegación lateral contraíble** se mantuvo: el botón de la cabecera alte
 
 ## 4. Catálogo y precios
 
-`tools/generate_catalog.py` descarga `items.json` y `formatted/items.json` de `ao-bin-dumps` y genera `data/catalog.js` como **módulo ES** (`export const CATALOG`). Contiene 8.302 recetas T2–T8 con encantamientos `.0`–`.4`, nombres ES/EN, `itemValue`, materiales (`ret:false`, `max`), diarios, `ccat`, `refine` y `upgrade`.
+`tools/generate_catalog.py` descarga `items.json` y `formatted/items.json` de [`ao-data/ao-bin-dumps`](https://github.com/ao-data/ao-bin-dumps) y genera `data/catalog.js` como **módulo ES** (`export const CATALOG`). Contiene los ítems T2–T8 que tienen receta de fabricación en los dumps, con encantamientos disponibles `.0`–`.4`, nombres ES/EN, `itemValue`, materiales (`ret:false`, `max`), recetas alternativas con corazones (`alternateRes`), diarios, `ccat`, `refine` y `upgrade`. Para los refinados encantados registra los IDs de mercado `T4_PLANKS_LEVEL1@1` y sus materiales de receta, aunque no figuren como una receta normal de encantamiento. No es la lista completa de todo objeto del juego: los objetos sin receta de fabricación no se incluyen como resultados seleccionables.
+
+Auditoría del catálogo actual contra `ao-bin-dumps` actualizado el 2026-11-02 (commit [`0483dd9`](https://github.com/ao-data/ao-bin-dumps/commit/0483dd97f1581dfaf02eed42f25f5ea2a3cb75e5)): 8.382 entradas, 8.382 IDs únicos y 2.626 IDs base; se añadieron 80 variantes de refinados encantados. Todos los IDs base están en los datos oficiales del juego. La serie Matadragones está incluida: búsqueda en español devuelve 75 variantes de 15 piezas base (armaduras de cabeza, pecho y pies de tiers 4–8, con encantamientos). El problema era que el selector limitaba la búsqueda a 40 coincidencias y la búsqueda global a 8. Ahora ambos muestran 100 por página y permiten ampliar resultados cuando hay más.
+
+### Refinamiento
+
+En lugar de buscar por nombre, Refinamiento permite seleccionar el tipo de salida (tablas, lingotes, cuero, tela o bloques), el tier y el encantamiento disponible en el dump del juego. La combinación resuelve la entrada de catálogo y consulta su ID de mercado y receta real. Piedra no ofrece encantamientos en los datos del juego. Las variantes encantadas de los otros refinados usan como materiales el recurso encantado del tier seleccionado y el refinado previo normal, de acuerdo con las recetas de `items.json`. Para 85 variantes de refinados, el catálogo incluye también la receta alternativa oficial que sustituye una unidad del recurso principal por un corazón de ciudad. La receta principal siempre se muestra; la opción alternativa se activa voluntariamente y cambia los materiales, precios y cálculo de costes sin modificar la receta primaria.
+
+La pestaña **Transmutación** rankea las conversiones de recursos T4–T8 al siguiente tier o encantamiento disponible. Cada candidato consume una unidad del recurso de origen y genera una del destino; se descuenta la tasa fija de plata del juego por cada salto, el impuesto de venta (4 % con Premium / 8 % sin Premium), las tarifas de órdenes cuando correspondan y un impuesto de estación configurable. Los costos por salto se basan en la tabla posterior a Wild Blood de [Albion Online Wiki · Transmuting](https://wiki.albiononline.com/wiki/Transmuting) y en los valores publicados por la comunidad en [octubre de 2023](https://www.reddit.com/r/albiononline/comments/17eo9jl/transmutation_cost/); el flujo y el requisito mínimo T4 están descritos en la [guía oficial de Refinamiento](https://albiononline.com/news/guide-refining). Los precios proceden de AODP, se solicitan por lotes y nunca se extrapolan. Si falta una cotización, el resultado queda pendiente y se puede ingresar el precio manualmente; el ranking tampoco incluye transporte.
 
 Como el archivo pesa ~5 MB y es ESM puro, `vite.config.js` incluye un pequeño middleware (`catalog-static`) que lo sirve **sin transformar en desarrollo**. Sin esto, Vite le inyecta un sourcemap inline que infla la respuesta a ~28 MB.
 
-`src/services/api.js` consulta `/api/v2/stats/prices/{ids}.json?locations=…&qualities=…` en West, East o Europe. Agrupa IDs, cachea 60 s, respeta `RateLimit-Reset` en un `429` y traduce un `TypeError` de `fetch` a un mensaje de posible bloqueo CORS. Las vistas nunca recargan precios automáticamente.
+`src/services/api.js` consulta `/api/v2/stats/prices/{ids}.json?locations=…&qualities=…` en West, East o Europe, agrupando varios ítems, ciudades y calidades por petición y evitando la caché HTTP del navegador. Deduplica peticiones simultáneas, respeta `RateLimit-Reset` en un `429` y traduce un `TypeError` de `fetch` a un mensaje de posible bloqueo CORS. Las vistas actualizan al seleccionar un ítem o cambiar filtros; el usuario también puede solicitar una actualización manual.
 
 | Modo | Campo AODP | Uso |
 |---|---|---|
 | Compra inmediata / orden de venta | `sell_price_min` | precio al que comprás o listás |
 | Venta directa / orden de compra | `buy_price_max` | precio al que te compran |
 
-Cada precio muestra su antigüedad (verde <2 h, dorado <4 h, rojo >4 h). Los valores escritos a mano se marcan en dorado y no se pisan al recargar, salvo «Sobrescribir precios manuales».
+Cada precio muestra su antigüedad (verde <2 h, dorado <4 h, rojo >4 h). La opción «Menor precio registrado» busca cotizaciones reales en las ocho ubicaciones y conserva la ciudad y la fecha de la cotización seleccionada: no promedia ni completa datos ausentes. Si AODP no devuelve un precio positivo, la interfaz indica «No se registra precio», deja el campo vacío y habilita la carga manual. El resultado de rentabilidad permanece oculto hasta que todos los precios necesarios estén cargados.
+
+### Actualización y cobertura de precios
+
+La fuente es [Albion Online Data Project (AODP)](https://www.albion-online-data.com/), que distribuye datos aportados por jugadores. La API separa los servidores (West, East y Europe) y permite consultar IDs de ítem, ubicaciones y calidades; cada servidor publica su [documentación de API](https://www.albion-online-data.com/api/). Las ciudades no son necesariamente igual de recientes: se conserva y muestra la fecha entregada por AODP, sin convertir un precio antiguo en uno actual.
+
+AODP explica que su [cliente comunitario](https://github.com/ao-data/albiondata-client/releases) solo puede aportar las órdenes de mercado que el jugador carga en el juego. Para mejorar la cobertura, se puede ejecutar ese cliente mientras se recorren los mercados de las ciudades/servidor/calidades buscados y luego volver a actualizar la consulta. La Calculadora no consulta históricos ni extrapola precios de otra calidad, ciudad o servidor; sin una cotización válida, el usuario puede introducir el valor manualmente.
 
 ## 5. Motor de cálculo
 
@@ -109,19 +123,29 @@ En React, `CalculatorView.jsx` guarda la configuración y los precios en estado 
 
 Filtros: ganancia mínima, ROI mínimo, antigüedad máxima, orden, límite, rutas seguras, permiso de misma ciudad e inclusión del Mercado Negro. «Abrir en calculadora» pasa la fila por `AppContext` (`opportunity`) y precarga ítem, ciudades, modos, RRR, Focus, tasa de estación y precios.
 
-## 7. Verificación
+## 7. Monturas: crianza y ensillado
+
+Monturas tiene dos flujos separados: **Crianza** y **Ensillado**. Ensillado reutiliza la calculadora de fabricación y sus recetas; Crianza usa los registros de bebé/adulto, tiempo de crecimiento, chance y cantidad promedio de crías, plata de crianza, nutrientes y categorías de alimento exportados desde los dumps oficiales en `data/catalog.js`.
+
+El alimento sugerido se calcula como `ceil(ceil(growTime / secondsPerNutrition) / nutritionPerFood)` y se puede modificar manualmente. Es una estimación a partir de los datos del dump, no una garantía de consumo exacto en cada ciclo. El dump distingue `@favorite` de `@foodcategory`: marca comidas favoritas para animales de granja (por ejemplo, trigo para gallinas y nabos para cabras), pero no asigna favoritos a los animales de montura incluidos; para estos solo declara las categorías aceptadas (plantas, carne o monturas). La interfaz muestra esta diferencia en lugar de suponer que un alimento de la misma categoría sea favorito. Las crías obtenidas se muestran como promedio estadístico (`cantidad × probabilidad × crías por éxito`); no representan una cantidad garantizada. El bonus y el costo de Focus del dump se exponen como datos de referencia pero **no se incorporan al resultado**, ya que su aplicación por ciclo no está validada.
+
+Fuente de mecánicas y atributos: [ao-bin-dumps/items.json](https://github.com/ao-data/ao-bin-dumps/blob/master/items.json), campos `consumption.food.acceptedfood.@foodcategory`, `@favorite` y `@favoritebonus` de `farmableitem`.
+
+La calculadora consulta AODP para la cría y el alimento al comprar, y el animal adulto y las crías al vender. Permite elegir ciudades, modo de compra/venta y completar manualmente los precios que no existan. El costo suma compras, plata de crianza y tarifa de orden de compra cuando aplica. Ingresos por ventas descuentan el impuesto Premium/no Premium y las tarifas de orden correspondientes. Las crías conservadas se muestran como valor de mercado separado y no como ganancia realizada. No se informa rentabilidad hasta cargar todos los precios necesarios.
+
+## 8. Verificación
 
 ```bash
 npm run check       # 40 archivos JS/JSX (esbuild + node --check)
-npm test            # 13 pruebas Vitest + Testing Library + jsdom
+npm test            # pruebas Vitest + Testing Library + jsdom
 npm run build       # bundle de producción
 npm run dev         # servidor en 0.0.0.0:8000
 ```
 
-Las pruebas cubren: marca exacta, barra superior y 10 módulos, colapso persistente, menús desplegables y submenús, hoja móvil, búsqueda global, autocompletado y chips `.0`–`.4`, receta y desglose, impuestos 4/8 %, RRR por ciudad y Focus, carga de precios, `429` y CORS, comparación de ciudades, las 4 estrategias del escáner, puente «Abrir en calculadora», matriz de precios por ciudad y calidad, y ausencia de errores de React al recorrer los 10 módulos. El `fetch` de AODP se simula en `tests/fixtures.js`.
+Las pruebas cubren: marca exacta, barra superior y 10 módulos, colapso persistente, menús desplegables y submenús, hoja móvil, búsqueda global, autocompletado y chips `.0`–`.4`, receta y desglose, impuestos 4/8 %, RRR por ciudad y Focus, carga de precios, `429` y CORS, comparación de ciudades, las 4 estrategias del escáner, puente «Abrir en calculadora», matriz de precios por ciudad y calidad, cálculo de crianza, crías retenidas, precios ausentes/manuales, navegación entre Crianza/Ensillado y precarga de monturas desde búsqueda global, y ausencia de errores de React al recorrer los 10 módulos. El `fetch` de AODP se simula en `tests/fixtures.js`.
 
-## 8. Límites conocidos
+## 9. Límites conocidos
 
 - Sin backend no hay histórico, volumen, login, Market P2P, Builds ni escaneo de miles de ítems en milisegundos.
-- CORS de AODP depende del navegador y del servidor; la app ofrece precios manuales y un campo de proxy opcional.
+- CORS de AODP depende del navegador y de la conexión; la app selecciona el endpoint regional automáticamente y ofrece edición manual si no se pueden obtener precios.
 - Los precios son comunitarios: pueden faltar o estar desactualizados. Siempre hay que verificar en el juego.

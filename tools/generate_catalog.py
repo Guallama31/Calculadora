@@ -14,12 +14,12 @@ Salida: un módulo ES con el catálogo (sin fetch()):
     export const CATALOG = [ ... ];
 
 Esquema de cada entrada:
-    id      ID de mercado (T5_2H_BOW@1)
-    base    ID base sin encantamiento
+    id      ID de mercado (T5_2H_BOW@1, T4_PLANKS_LEVEL1@1)
+    base    ID base sin encantamiento (las variantes refinadas comparten el ID base)
     lvl     nivel de encantamiento 0-4
     tier    2-8
     es/en   nombres localizados (+ sufijo " .N" si está encantado)
-    cat/sub categoría y subcategoría de tienda
+    cat/sub/sub2 categorías originales de tienda; categoryId se deriva al cargar el catálogo
     value   item value (suma de los valores de los materiales); base de la nutrición
     amount  unidades producidas por crafteo
     res[]   {id, es, q, ret=false?, max=?}  (si falta "ret" se asume retornable)
@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import urllib.request
 
 REPO = "ao-data/ao-bin-dumps"
@@ -100,8 +101,8 @@ def main():
     if args.full and args.index:
         full_path, index_path = args.full, args.index
     else:
-        print("Descargando dumps de ao-bin-dumps…")
-        tmp = "/tmp/ao-catalog-dumps"
+        print("Descargando dumps de ao-bin-dumps...")
+        tmp = os.path.join(tempfile.gettempdir(), "ao-catalog-dumps")
         os.makedirs(tmp, exist_ok=True)
         full_path = args.full or download_dump(FULL_PATH, os.path.join(tmp, "items.json"))
         index_path = args.index or download_dump(INDEX_PATH, os.path.join(tmp, "formatted_items.json"))
@@ -192,7 +193,7 @@ def main():
             return None
         return {"id": rid, "es": localized(rid, "ES-ES"), "q": quantity}
 
-    def recipe_at(data, level):
+    def recipe_at(data, level, faction_recipe=False):
         if level == 0:
             requirements = as_list(data.get("craftingrequirements"))
         else:
@@ -206,31 +207,70 @@ def main():
             if not isinstance(requirement, dict):
                 continue
             resources = as_list(requirement.get("craftresource"))
-            if resources and not any(
+            has_faction_resource = any(
                 "FACTION_" in (r.get("@uniquename") or "")
                 for r in resources if isinstance(r, dict)
-            ):
+            )
+            if resources and has_faction_resource == faction_recipe:
                 return requirement, resources
         return None
+
+    def normalize_resources(raw_resources, level):
+        resources = []
+        for raw in raw_resources:
+            if not isinstance(raw, dict):
+                continue
+            resource_id = raw.get("@uniquename")
+            quantity = int(num(raw.get("@count")))
+            if not resource_id or quantity <= 0:
+                continue
+            resource_level = level if num(raw.get("@enchantmentlevel")) > 0 else 0
+            rid = market_id(resource_id, resource_level)
+            max_return = raw.get("@maxreturnamount")
+            returnable = True if max_return is None else num(max_return) > 0
+            entry = {"id": rid, "es": localized(rid, "ES-ES"), "q": quantity}
+            if not returnable:
+                entry["ret"] = False
+            elif max_return is not None and num(max_return) > 0:
+                entry["max"] = num(max_return)
+            resources.append(entry)
+        return resources
 
     catalog = []
     for uid, (kind, data) in details.items():
         match = re.match(r"^T([2-8])_", uid)
-        if not match or "_LEVEL" in uid or "@" in uid:
+        if not match or "@" in uid:
             continue
         tier = int(match.group(1))
         crafting_category = (data.get("@craftingcategory") or "").lower()
+        refined_match = re.match(r"^(T[2-8]_.+)_LEVEL([1-4])$", uid)
+        is_enchanted_refined_material = (
+            refined_match is not None
+            and (data.get("@shopcategory") or "") == "crafting"
+            and (data.get("@shopsubcategory1") or "").lower() == "refinedresources"
+        )
+        if "_LEVEL" in uid and not is_enchanted_refined_material:
+            continue
 
-        for level in range(5):
-            recipe = recipe_at(data, level)
+        is_refining = crafting_category in ("wood", "ore", "hide", "fiber", "rock") and \
+                      (data.get("@shopcategory") or "") == "crafting"
+        levels = [int(refined_match.group(2))] if is_enchanted_refined_material else range(5)
+        for level in levels:
+            recipe = recipe_at(data, 0 if is_enchanted_refined_material else level)
             if not recipe:
                 continue
             requirement, raw_resources = recipe
-            market_name = uid if level == 0 else f"{uid}@{level}"
-            if level > 0 and market_name not in names:
+            base_id = refined_match.group(1) if is_enchanted_refined_material else uid
+            market_name = f"{uid}@{level}" if is_enchanted_refined_material else (
+                uid if level == 0 else f"{uid}@{level}"
+            )
+            if level > 0 and not is_enchanted_refined_material and market_name not in names:
                 continue
 
-            resources = []
+            resources = normalize_resources(raw_resources, level)
+            alternate_recipe = recipe_at(data, 0 if is_enchanted_refined_material else level,
+                                         faction_recipe=True) if is_refining else None
+            alternate_resources = normalize_resources(alternate_recipe[1], level) if alternate_recipe else []
             material_count = 0
             for raw in raw_resources:
                 if not isinstance(raw, dict):
@@ -239,16 +279,6 @@ def main():
                 quantity = int(num(raw.get("@count")))
                 if not resource_id or quantity <= 0:
                     continue
-                resource_level = level if num(raw.get("@enchantmentlevel")) > 0 else 0
-                rid = market_id(resource_id, resource_level)
-                max_return = raw.get("@maxreturnamount")
-                returnable = True if max_return is None else num(max_return) > 0
-                entry = {"id": rid, "es": localized(rid, "ES-ES"), "q": quantity}
-                if not returnable:
-                    entry["ret"] = False
-                elif max_return is not None and num(max_return) > 0:
-                    entry["max"] = num(max_return)
-                resources.append(entry)
                 upper = resource_id.upper()
                 if not any(k in upper for k in ("_ARTEFACT_", "_FAVOR_", "_ALCHEMY_")):
                     material_count += quantity
@@ -276,31 +306,115 @@ def main():
             suffix = f" .{level}" if level else ""
             catalog.append({
                 "id": market_name,
-                "base": uid,
+                "base": base_id,
                 "lvl": level,
                 "tier": tier,
-                "es": localized(market_name, "ES-ES") + suffix,
-                "en": localized(market_name, "EN-US") + suffix,
+                "es": localized(base_id, "ES-ES") + suffix,
+                "en": localized(base_id, "EN-US") + suffix,
                 "cat": data.get("@shopcategory") or "",
                 "sub": data.get("@shopsubcategory1") or "",
+                "sub2": data.get("@shopsubcategory2") or "",
                 "ccat": crafting_category,
-                "refine": crafting_category in ("wood", "ore", "hide", "fiber", "rock") and
-                          (data.get("@shopcategory") or "") == "crafting",
+                "refine": is_refining,
                 "value": round(value, 2),
                 "amount": int(num(requirement.get("@amountcrafted"), 1)) or 1,
                 "res": resources,
+                **({"alternateRes": alternate_resources} if alternate_resources else {}),
                 "upgrade": upgrade_at(data, level),
                 "journal": journal,
             })
 
     catalog.sort(key=lambda x: (x["base"], x["lvl"]))
+
+    mount_grown_ids = {
+        resource["id"]
+        for item in catalog
+        if item["cat"] == "mounts"
+        for resource in item["res"]
+        if resource["id"] in details
+    }
+    mount_breeding = []
+    accepted_food_categories = set()
+    for uid, (kind, data) in details.items():
+        grown_item = data.get("grownitem")
+        grown_id = grown_item.get("@uniquename") if isinstance(grown_item, dict) else None
+        if kind != "farmableitem" or grown_id not in mount_grown_ids:
+            continue
+        food = data.get("consumption", {}).get("food", {})
+        accepted_food = as_list(food.get("acceptedfood") if isinstance(food, dict) else None)
+        accepted_food_entries = [
+            entry for entry in accepted_food if isinstance(entry, dict)
+        ]
+        food_categories = sorted({
+            entry.get("@foodcategory")
+            for entry in accepted_food_entries if entry.get("@foodcategory")
+        })
+        favorite_food_id = next(
+            (entry.get("@favorite") for entry in accepted_food_entries if entry.get("@favorite")),
+            None,
+        )
+        accepted_food_categories.update(food_categories)
+        offspring = grown_item.get("offspring", {})
+        requirements = data.get("craftingrequirements", {})
+        mount_breeding.append({
+            "id": uid,
+            "es": localized(uid, "ES-ES"),
+            "tier": int(num(data.get("@tier"))),
+            "plot": data.get("@shopsubcategory1") or "",
+            "type": data.get("@shopsubcategory3") or "",
+            "grownId": grown_id,
+            "grownEs": localized(grown_id, "ES-ES"),
+            "growTime": num(grown_item.get("@growtime")),
+            "offspringChance": num(offspring.get("@chance")),
+            "offspringAmount": num(offspring.get("@amount")),
+            "silverCost": num(requirements.get("@silver")) if isinstance(requirements, dict) else 0,
+            "nutritionMax": num(food.get("@nutritionmax")) if isinstance(food, dict) else 0,
+            "secondsPerNutrition": num(food.get("@secondspernutrition")) if isinstance(food, dict) else 0,
+            "lossBeforeHungry": num(food.get("@lossbeforehungry")) if isinstance(food, dict) else 0,
+            "focusCost": num(data.get("@activefarmfocuscost")),
+            "focusBonus": num(data.get("@activefarmbonus")),
+            "focusMaxCycles": num(data.get("@activefarmmaxcycles")),
+            "foodCategories": food_categories,
+            "favoriteFoodId": favorite_food_id,
+            "favoriteFoodEs": localized(favorite_food_id, "ES-ES") if favorite_food_id else None,
+            "favoriteFoodBonus": next(
+                (num(entry.get("@favoritebonus")) for entry in accepted_food_entries
+                 if entry.get("@favorite")),
+                0,
+            ),
+        })
+    mount_breeding.sort(key=lambda item: (item["tier"], item["es"]))
+
+    mount_foods = []
+    for uid, (_kind, data) in details.items():
+        nutrition = num(data.get("@nutrition"))
+        food_category = data.get("@foodcategory")
+        if nutrition <= 0 or food_category not in accepted_food_categories:
+            continue
+        mount_foods.append({
+            "id": uid,
+            "es": localized(uid, "ES-ES"),
+            "tier": int(num(data.get("@tier"))),
+            "nutrition": nutrition,
+            "category": food_category,
+        })
+    mount_foods.sort(key=lambda item: (item["tier"], item["es"], item["id"]))
+
+    if not mount_breeding or not mount_foods:
+        raise ValueError("No se pudieron generar los datos de crianza de monturas.")
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as handle:
         handle.write("/* Generado por tools/generate_catalog.py desde ao-bin-dumps. No editar a mano. */\n")
         handle.write("export const CATALOG = ")
         json.dump(catalog, handle, ensure_ascii=False, separators=(",", ":"))
+        handle.write(";\nexport const MOUNT_BREEDING = ")
+        json.dump(mount_breeding, handle, ensure_ascii=False, separators=(",", ":"))
+        handle.write(";\nexport const MOUNT_FOODS = ")
+        json.dump(mount_foods, handle, ensure_ascii=False, separators=(",", ":"))
         handle.write(";\n")
-    print(f"Listo: {len(catalog)} recetas → {OUT} ({os.path.getsize(OUT) / 1024 / 1024:.2f} MB)")
+    print(f"Listo: {len(catalog)} recetas, {len(mount_breeding)} animales y "
+          f"{len(mount_foods)} alimentos -> {OUT} ({os.path.getsize(OUT) / 1024 / 1024:.2f} MB)")
 
 
 if __name__ == "__main__":

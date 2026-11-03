@@ -1,14 +1,14 @@
 # Calculadora
 
-**Calculadora** es una app web para calcular la rentabilidad real de producir, encantar, refinar o revender ítems de Albion Online, y para encontrar oportunidades de mercado entre ciudades. Usa **8.302 recetas reales del juego**, los **precios del Albion Online Data Project**, los **bonus de producción por ciudad** y **todos los impuestos** que se pagan al vender. Servidor **Américas (West)** por defecto; también Asia (East) y Europa.
+**Calculadora** es una app web para calcular la rentabilidad real de producir, encantar, refinar o revender ítems de Albion Online, y para encontrar oportunidades de mercado entre ciudades. Usa **8.382 recetas reales del juego**, los **precios del Albion Online Data Project**, los **bonus de producción por ciudad** y **todos los impuestos** que se pagan al vender. Servidor **Américas (West)** por defecto; también Asia (East) y Europa.
 
 Stack: **React 18 + Vite 6 + Tailwind CSS 4 + componentes Radix/shadcn + lucide-react**. Los servicios de cálculo, catálogo y API son módulos ES puros reutilizados sin cambios.
 
 ## Diseño
 
 - Fondo blanco / gris muy claro, tarjetas con bordes suaves, **azul** principal y **dorado** de acento; botones principales azules y ganancias positivas en verde.
-- **Barra superior** (altura 56 px) adaptada de *ApplicationShell3*: menús desplegables por grupo, búsqueda global de módulos e ítems, hoja deslizante para móvil y controles compartidos de servidor / calidad / Premium.
-- **Navegación lateral contraíble** con 10 módulos agrupados en *Producción*, *Especialidades* y *Mercado*; el estado del colapso se guarda en `localStorage`.
+- **Barra superior** (altura 56 px) con un único menú lateral desplegable, búsqueda global de módulos e ítems y controles compartidos de servidor / calidad / Premium.
+- **Menú lateral desplegable** con 10 módulos agrupados en *Producción*, *Especialidades* y *Mercado*, disponible en cualquier tamaño de pantalla.
 - **Pestañas horizontales** dentro de cada módulo y distribución *configuración a la izquierda · resultados a la derecha*.
 - Sin cuentas, avatares ni workspaces ficticios: la app no tiene login ni backend.
 
@@ -18,8 +18,9 @@ Stack: **React 18 + Vite 6 + Tailwind CSS 4 + componentes Radix/shadcn + lucide-
 |---|---|
 | **Crafteo** | Calculadora completa: receta, materiales editables, RRR, diarios, tasa de estación, impuestos, comparativa Premium y comparación de ciudades. |
 | **Encantamiento** | El mismo motor sobre recetas de ítems encantados (runas, almas y reliquias). |
-| **Refinamiento** | Recetas de refinado con el bonus real de la ciudad. |
-| **Agricultura**, **Animales**, **Monturas**, **Alquimia**, **Cocina** | La misma calculadora filtrada al catálogo de cada actividad. |
+| **Refinamiento** | Recetas con bonus de ciudad, recetas alternativas con corazones y ranking de transmutación. |
+| **Agricultura**, **Animales**, **Alquimia**, **Cocina** | La calculadora filtrada al catálogo de cada actividad. |
+| **Monturas** | Flujos separados de crianza y ensillado, con precios AODP/manuales, costos y crías promedio. |
 | **Flipping** | Escáner con 4 estrategias en pestañas: *Flip*, *Royal → BM*, *Craft Trades* y *Refining Trades*. |
 | **Precios** | Matriz de precios por ciudad y comparativa por calidad, con antigüedad de cada dato. |
 
@@ -28,8 +29,8 @@ Stack: **React 18 + Vite 6 + Tailwind CSS 4 + componentes Radix/shadcn + lucide-
 - **Ítem y encantamiento**: buscador con autocompletado (nombre ES/EN o ID, tolerante a acentos) y chips `.0`–`.4`. La **búsqueda global** de la cabecera abre cualquier ítem directamente en Crafteo.
 - **Dónde craftear / refinar**: la ciudad aplica su bonus real (base 0,18; +0,40 refinado; +0,15 por categoría; Focus +0,59; bonus diario) y calcula el RRR automáticamente. También existe modo *Automática*.
 - **Dónde comprar** los materiales y **dónde vender** el ítem, con compra inmediata / orden de compra y venta directa / orden de venta.
-- **Precios manuales** para materiales, venta, diarios y tarifa de estación (introducida a mano). «Cargar precios del mercado» completa los datos desde AODP y **respeta los valores manuales** salvo que se active «Sobrescribir».
-- **Impuestos**: 4 % con Premium / 8 % sin Premium, tarifa de orden de venta 2,5 % (más republicaciones), tarifa de orden de compra opcional y comparativa lado a lado con/sin Premium.
+- **Precios automáticos**: al elegir un ítem, la calculadora consulta AODP y completa materiales y precio de venta; en Crafteo y Encantamiento también compara las ciudades con cotización disponible y recomienda el mejor precio de venta. Al cargar precios se reemplazan los valores manuales. Diarios y tarifa de estación se introducen a mano.
+- **Impuestos**: 4 % con Premium / 8 % sin Premium, tarifa de orden de venta 2,5 %, tarifa de orden de compra opcional y comparativa lado a lado con/sin Premium.
 - **Diarios de crafteo** con fama, diarios vacíos y llenos.
 - **Resultado**: desglose completo, ganancia neta, ROI, ganancia por ítem, precio de equilibrio y comparación de ganancia por ciudad.
 - **Escáner**: filtros de categoría, tier, encantamiento, ciudad de compra, ciudades de venta, rutas seguras, RRR, Focus, bonus diario, tasa de estación, ganancia mínima, ROI mínimo, antigüedad máxima, orden y límite de filas. Cada fila se puede **abrir en la calculadora** con el ítem, las ciudades y los precios precargados.
@@ -41,7 +42,7 @@ npm install          # primera vez
 npm run dev          # Vite en http://localhost:8000 (0.0.0.0, apto para preview)
 npm run build        # bundle de producción en dist/
 npm run preview      # sirve dist/ en el puerto 8000
-npm test             # 13 pruebas con Vitest + Testing Library + jsdom
+npm test             # pruebas con Vitest + Testing Library + jsdom
 npm run check        # verifica sintaxis de JS / JSX (esbuild + node --check)
 npm run catalog      # regenera data/catalog.js desde ao-bin-dumps (Python 3)
 ```
@@ -55,14 +56,14 @@ Calculadora/
 ├── index.html                          # #root + /src/main.jsx
 ├── package.json                        # scripts y dependencias
 ├── vite.config.js                      # React, Tailwind, host del preview, Vitest
-├── data/catalog.js                     # módulo ES con 8.302 recetas generadas
+├── data/catalog.js                     # módulo ES con 8.382 recetas generadas
 ├── src/
 │   ├── main.jsx                        # createRoot + AppProvider
-│   ├── App.jsx                         # shell + sidebar + módulo activo
+│   ├── App.jsx                         # shell + módulo activo
 │   ├── app/AppContext.jsx              # router por hash, preferencias, estado compartido
 │   ├── components/
 │   │   ├── ui/                         # Button, Input, DropdownMenu, Sheet, ScrollArea, Separator
-│   │   ├── layout/                     # ApplicationShell, Sidebar, NavDropdown, MobileNav,
+│   │   ├── layout/                     # ApplicationShell, MobileNav,
 │   │   │                               # GlobalSearch, Logo, sidebar-data
 │   │   ├── common/                     # Tabs, Field, DataTable, ResultCard, ItemSelector
 │   │   └── charts/PriceBars.jsx
@@ -97,8 +98,9 @@ Todo el estado se guarda en `localStorage` (`calculadora-prefs-v1`): ciudad de c
 - Lógica y modelo de datos inspirados en [Triky313/AlbionOnline-StatisticsAnalysis](https://github.com/Triky313/AlbionOnline-StatisticsAnalysis) (GPL-3.0), **reimplementados en JavaScript**.
 - Shell, menús y hoja móvil adaptados de un bloque *ApplicationShell3* de shadcnblocks (React + Radix + Tailwind).
 - Funciones y filtros del escáner inspirados en [Albion Market Hub](https://albionmarkethub.com/trades); ver `docs/analisis-albionmarkethub.md`.
+- Propuesta vigente para mejorar cobertura y manejo de precios: [`docs/cobertura-precios-propuesta.md`](docs/cobertura-precios-propuesta.md).
 
-> Sin backend: el escáner consulta la API pública directamente y analiza un subconjunto acotado de ítems por búsqueda. No hay auto-refresh; si la API responde `429`, reducí el número de ítems o esperá. La app ofrece precios manuales y un proxy CORS opcional.
+> Sin backend: la app selecciona automáticamente el endpoint regional de AODP y consulta un subconjunto acotado de ítems por búsqueda. No hay actualización periódica en segundo plano; las pantallas consultan AODP al solicitar o cambiar sus parámetros. Si la API responde `429`, reducí el número de ítems o esperá. Los precios también se pueden editar manualmente.
 
 ## Aviso
 

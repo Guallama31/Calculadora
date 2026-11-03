@@ -52,7 +52,7 @@ Filtros globales **Category / Tier / Enchantment / Quality**, contador «Communi
 
 ### Qué **no** se puede copiar tal cual en una web estática
 - El **escaneo completo de miles de ítems en milisegundos**: requiere servidor, caché propia y/o el stream NATS de AODP. Calculadora es 100 % cliente, sin backend ni login, así que consulta la API pública directamente.
-- **Límites de AODP**: 100 req/min y 300/5 min por IP, URL < 4096 caracteres, `429` con `RateLimit-*`. Por eso el escáner limita los ítems por búsqueda (por defecto 60), agrupa todos los IDs en pocas peticiones, usa caché de 60 s y **nunca refresca automáticamente**.
+- **Límites de AODP**: URL < 4096 caracteres y respuestas `429` con `RateLimit-*`. Por eso el escáner limita los ítems por búsqueda (por defecto 60) y agrupa IDs en pocas peticiones. La app evita la caché HTTP y actualiza al seleccionar/cambiar filtros; Flipping también vuelve a consultar mientras está abierto.
 - **Market P2P, cuentas, Discord, alertas, historial de sesiones, Builds, planes PRO**: necesitan backend, base de datos e identidad; quedan fuera del alcance.
 - Los datos de **confianza/volumen** (spreads de 7 días, «Community Profit») requieren histórico propio; Calculadora muestra la antigüedad del precio y deja el criterio al usuario.
 
@@ -94,8 +94,8 @@ Cada fila ofrece **«Abrir en calculadora»**, que precarga ítem, ciudad de cra
 
 ## 4. Limitaciones honestas y siguientes pasos
 
-1. El escaneo examina un **subconjunto acotado** de ítems (5–250, por defecto 60), no el catálogo completo de 8.302 recetas. Ampliarlo exigiría un backend con caché.
-2. No hay **volumen/liquidez** ni histórico de 7 días: una oportunidad puede ser un precio viejo o una orden ya consumida. De ahí el aviso permanente y el filtro de antigüedad.
+1. El escaneo examina un **subconjunto acotado** de ítems (5–250, por defecto 60), no el catálogo completo de 8.382 recetas. Ampliarlo exigiría un backend con caché.
+2. No hay **volumen/liquidez** ni histórico de 7 días: una oportunidad puede ser un precio viejo o una orden ya consumida. De ahí el aviso permanente y el filtro de antigüedad. La Calculadora muestra cotizaciones registradas, no promedios calculados; si no hay dato válido, el campo queda disponible para carga manual.
 3. No se incluyen **diarios, coste de transporte ni riesgo de gank** en el escáner; se afinan en la calculadora.
 4. El Mercado Negro solo compra equipo; los recursos devuelven precio 0 y se descartan automáticamente.
 5. Posibles mejoras: histórico (`/stats/history/`), volumen estimado, guardado de planes y comparación de las 8 ciudades para un ítem. Las alertas en tiempo real sí requerirían backend.

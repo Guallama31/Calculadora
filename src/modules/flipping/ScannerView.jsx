@@ -1,6 +1,6 @@
-/* Módulo Flipping / TRADES: 4 estrategias en pestañas horizontales. */
+/* Módulo Flipping / TRADES con estrategias por pestañas horizontales. */
 import * as React from 'react';
-import { CITIES, CRAFT_CITIES, CATEGORIES, ROYAL_CITIES, BLACK_MARKET } from '../../settings/index.js';
+import { CITIES, CRAFT_CITIES, CATEGORIES, QUALITIES, ROYAL_CITIES, BLACK_MARKET } from '../../settings/index.js';
 import * as catalog from '../../services/catalog.js';
 import { esc, fmt, fmt1, fmt2, ageInfo, profitClass } from '../../services/format.js';
 import { useApp } from '../../app/AppContext.jsx';
@@ -13,14 +13,15 @@ import { scan, STRATEGIES, describe } from './scanner.js';
 import { cn } from '../../lib/utils.js';
 
 const DEFAULTS = {
-  category: '', query: '', tier: '', ench: '', maxItems: 60,
+  category: '', query: '', tier: '', ench: '', maxItems: 60, globalScan: false,
   buyCity: 'auto', sellCities: ROYAL_CITIES.slice(),
   safeOnly: true, sameCity: false, includeBM: false,
   buyMode: 'instant', sellMode: 'order',
   craftCity: 'auto', rrrMode: 'auto', manualRRR: 36.7,
   focus: false, dailyBonus: 0, stationFee: 0, buyOrderFee: false,
-  minProfit: 0, minRoi: 0, maxAgeHours: 8, sort: 'profit', limit: 30,
 };
+
+export const AUTO_SCAN_INTERVAL_MS = 15 * 60 * 1000;
 
 export default function ScannerView({ meta }) {
   const { shared, pending, navigate } = useApp();
@@ -32,34 +33,75 @@ export default function ScannerView({ meta }) {
   const [status, setStatus] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
+  const busyRef = React.useRef(false);
+  const runRef = React.useRef(null);
   const set = (key, value) => setOpts(current => ({ ...current, [key]: value }));
   const isCraft = strategy === 'craft' || strategy === 'refine';
   const current = STRATEGIES.find(s => s.id === strategy);
 
   async function run() {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true); setRows([]); setSummary(null); setProgress(5);
     setStatus('Consultando precios…');
     try {
       const result = await scan({
-        ...opts, strategy, server: shared.server, quality: shared.quality,
+        ...opts,
+        category: opts.globalScan ? '' : opts.category,
+        buyCity: opts.globalScan ? 'auto' : opts.buyCity,
+        sellCities: opts.globalScan ? CITIES.map(city => city.value) : opts.sellCities,
+        safeOnly: opts.globalScan ? false : opts.safeOnly,
+        includeBM: opts.globalScan ? true : opts.includeBM,
+        strategy, server: shared.server, quality: shared.quality,
         premium: shared.premium,
-        tiers: opts.tier ? [Number(opts.tier)] : [4, 5, 6, 7, 8],
-        enchants: opts.ench ? [Number(opts.ench)] : [0],
-        query: opts.query.trim(), proxy: '',
+        tiers: opts.tier ? [Number(opts.tier)] : [2, 3, 4, 5, 6, 7, 8],
+        enchants: opts.ench ? [Number(opts.ench)]
+          : [0, 1, 2, 3, 4],
+        query: opts.query.trim(),
       }, p => {
         setStatus(p.message);
         if (p.total) setProgress(Math.max(5, p.done / p.total * 100));
       });
-      setSummary({ candidates: result.candidates, requests: result.requests, prices: result.prices });
+      setSummary({
+        candidates: result.candidates, requests: result.requests, prices: result.prices,
+        deduplicated: result.deduplicated, coverage: result.coverage,
+        cacheNotice: result.cacheNotice,
+      });
       setRows(result.rows);
       setProgress(100);
       setStatus(result.rows.length
-        ? `✔ ${result.rows.length} oportunidades. Verificá los precios en el juego.`
-        : '✔ Búsqueda terminada sin resultados.');
+        ? `✔ ${result.rows.length} mejores oportunidades por ganancia neta. Verificá los precios en el juego. ${result.cacheNotice}`
+        : `✔ Búsqueda terminada sin resultados. ${result.cacheNotice}`);
     } catch (error) {
       setStatus('✖ ' + error.message);
-    } finally { setBusy(false); }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  function changeStrategy(id) {
+    if (id === 'upgrade' && Number(opts.ench) > 3) set('ench', '');
+    setStrategy(id);
+  }
+
+  runRef.current = run;
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      if (!busyRef.current) void runRef.current();
+    }, AUTO_SCAN_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  function setGlobalScan(enabled) {
+    setOpts(currentOpts => ({
+      ...currentOpts,
+      globalScan: enabled,
+      ...(enabled ? {
+        category: '', buyCity: 'auto', sellCities: CITIES.map(city => city.value),
+        safeOnly: false, includeBM: true, maxItems: 250,
+      } : {}),
+    }));
   }
 
   const cityChecks = (
@@ -68,7 +110,8 @@ export default function ScannerView({ meta }) {
         {CITIES.map(c => (
           <label className="check" key={c.value}>
             <input type="checkbox" className="sell-city" value={c.value}
-              checked={opts.sellCities.includes(c.value)} disabled={strategy === 'royalbm'}
+              checked={opts.sellCities.includes(c.value)}
+              disabled={strategy === 'royalbm' || opts.globalScan}
               onChange={e => set('sellCities', e.target.checked
                 ? [...opts.sellCities, c.value] : opts.sellCities.filter(x => x !== c.value))} />
             <span>{c.label}</span>
@@ -81,15 +124,25 @@ export default function ScannerView({ meta }) {
   const columns = [
     { label: 'Ítem', render: r => (
       <div className="material-cell">
-        <img src={catalog.icon(r.id, r.quality)} alt="" />
-        <div><strong>{r.item.es}</strong><small>{r.id}</small></div>
+        <img className="opportunity-item-icon" src={catalog.icon(r.id, r.quality)} alt="" />
+        <div><strong>{r.item.es}</strong><small>{r.id}</small>
+          <small>T{r.item.tier}.{r.item.lvl} · {QUALITIES[r.quality - 1]?.label || `Calidad ${r.quality}`}</small>
+        </div>
       </div>
     ) },
     { label: 'Ruta', render: r => (
       <div className="route">
-        <span>{r.buyCity} → {r.sellCity}</span>
-        {isCraft
+        <div className="trade-cities">
+          <span>Comprar en {r.buyCity}</span>
+          <span>Vender en {r.sellCity}</span>
+        </div>
+        {r.strategy === 'craft' || r.strategy === 'refine'
           ? <small>craftear en {r.craftCity} · RRR {fmt1(r.rrr)} %</small>
+          : r.strategy === 'upgrade'
+            ? <>
+              <small>mejorar .{Math.max(0, r.item.lvl - 1)} → .{r.item.lvl}</small>
+              <small>{r.materialPrices.map(part => `${part.q}× ${part.es} (${fmt(part.price)})`).join(' + ')}</small>
+            </>
           : <small>buy {r.buyMode === 'instant' ? 'inmediata' : 'orden'} · sell {r.sellMode === 'instant' ? 'directa' : 'orden'}</small>}
       </div>
     ) },
@@ -104,7 +157,10 @@ export default function ScannerView({ meta }) {
     } },
     { label: '', align: 'right', render: r => (
       <button type="button" className="btn tiny" data-open={r.id}
-        onClick={() => navigate('crafting', { opportunity: r })}>Abrir en calculadora</button>
+        onClick={() => r.strategy === 'upgrade'
+          ? navigate('enchanting', { itemId: r.id }) : navigate('crafting', { opportunity: r })}>
+        {r.strategy === 'upgrade' ? 'Abrir encantamiento' : 'Abrir en calculadora'}
+      </button>
     ) },
   ];
 
@@ -115,13 +171,19 @@ export default function ScannerView({ meta }) {
         <span className="module-badge">{meta?.group}</span>
       </div>
       <Tabs id="scan-tabs" tabs={STRATEGIES.map(s => ({ id: s.id, label: s.label }))}
-        active={strategy} onChange={setStrategy} />
+        active={strategy} onChange={changeStrategy} />
       <p className="strategy-hint" id="scan-strategy-hint">{current.description}</p>
       <div className="work-grid">
         <div className="config-col">
           <section className="card">
             <div className="card-head"><h2>Filtros</h2><span className="card-tag" id="scan-strategy-tag">{current.label}</span></div>
+            <Toggle id="scan-global" label="Rastrear todas las categorías y ciudades"
+              checked={opts.globalScan} onChange={setGlobalScan} />
+            {opts.globalScan && (
+              <p className="hint">Analiza hasta 250 ítems repartidos entre categorías; compra en las 7 ciudades reales y compara ventas en esas ciudades y el Mercado Negro.</p>
+            )}
             <Select id="scan-category" label="Categoría" options={CATEGORIES} value={opts.category}
+              disabled={opts.globalScan}
               onChange={v => set('category', v)} />
             <label className="field"><span>Buscar nombre o ID (opcional)</span>
               <input id="scan-query" type="search" className="text-input" placeholder="Ej: arco, T4_BAG…"
@@ -131,7 +193,8 @@ export default function ScannerView({ meta }) {
               <Select id="scan-tier" label="Tier" value={opts.tier} onChange={v => set('tier', v)}
                 options={[{ value: '', label: 'Todos' }, ...[2, 3, 4, 5, 6, 7, 8].map(t => ({ value: t, label: 'T' + t }))]} />
               <Select id="scan-ench" label="Encantamiento" value={opts.ench} onChange={v => set('ench', v)}
-                options={[{ value: '', label: 'Todos' }, ...[0, 1, 2, 3, 4].map(e => ({ value: e, label: '.' + e }))]} />
+                options={[{ value: '', label: 'Todos' }, ...(strategy === 'upgrade' ? [1, 2, 3] : [0, 1, 2, 3, 4])
+                  .map(e => ({ value: e, label: '.' + e }))]} />
             </div>
             <NumberField id="scan-max-items" label="Ítems a analizar" value={opts.maxItems} min={5} step={5}
               hint="Más ítems = más peticiones a la API" onChange={v => set('maxItems', v)} />
@@ -140,17 +203,17 @@ export default function ScannerView({ meta }) {
           <section className="card">
             <div className="card-head"><h2>Rutas y mercados</h2></div>
             <Select id="scan-buy-city" label="Ciudad de compra" value={opts.buyCity}
-              onChange={v => set('buyCity', v)}
+              onChange={v => set('buyCity', v)} disabled={opts.globalScan}
               options={[{ value: 'auto', label: 'Automática (mejor precio)' },
                 ...CITIES.slice(0, 7).map(c => ({ value: c.value, label: c.label }))]} />
             {cityChecks}
             <Toggle id="scan-safe-only" label="Solo rutas seguras (5 ciudades reales)"
-              checked={opts.safeOnly} onChange={v => set('safeOnly', v)} />
+              checked={opts.safeOnly} onChange={v => set('safeOnly', v)} disabled={opts.globalScan} />
             <Toggle id="scan-same-city" label="Permitir comprar y vender en la misma ciudad"
               checked={opts.sameCity} onChange={v => set('sameCity', v)} />
             {strategy !== 'royalbm' && (
               <Toggle id="scan-include-bm" label="Incluir Mercado Negro en la venta"
-                checked={opts.includeBM} onChange={v => set('includeBM', v)} />
+                checked={opts.includeBM} onChange={v => set('includeBM', v)} disabled={opts.globalScan} />
             )}
             <Select id="scan-buy-mode" label="Modo de compra" value={opts.buyMode}
               onChange={v => set('buyMode', v)}
@@ -184,42 +247,38 @@ export default function ScannerView({ meta }) {
             </section>
           )}
 
-          <section className="card">
-            <div className="card-head"><h2>Filtros de resultado</h2></div>
-            <NumberField id="scan-min-profit" label="Ganancia mínima por unidad" value={opts.minProfit}
-              onChange={v => set('minProfit', v)} />
-            <NumberField id="scan-min-roi" label="ROI mínimo (%)" value={opts.minRoi}
-              onChange={v => set('minRoi', v)} />
-            <NumberField id="scan-max-age" label="Antigüedad máxima (h, 0 = sin límite)" value={opts.maxAgeHours}
-              onChange={v => set('maxAgeHours', v)} />
-            <Select id="scan-sort" label="Ordenar por" value={opts.sort} onChange={v => set('sort', v)}
-              options={[{ value: 'profit', label: 'Ganancia' }, { value: 'roi', label: 'ROI' },
-                { value: 'margin', label: 'Margen' }, { value: 'freshness', label: 'Frescura' }]} />
-            <NumberField id="scan-limit" label="Filas a mostrar" value={opts.limit} min={1}
-              onChange={v => set('limit', v)} />
+          <section className="card" id="scan-run-card">
             <button type="button" className="btn primary full" id="scan-run" disabled={busy} onClick={run}>
               Buscar oportunidades
             </button>
             <p className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')} id="scan-status">{status}</p>
-            <p className="hint">Sin recarga automática: cada búsqueda hace solo las peticiones necesarias para respetar el límite de AODP.</p>
+            <p className="hint">Actualización automática cada 15 minutos mientras Flipping esté abierto. Los resultados se ordenan por ganancia neta.</p>
           </section>
         </div>
 
         <div className="results-col">
-          <section className="card">
+          <section className="card" id="scan-summary">
             <div className="card-head"><h2>Resumen</h2>
               <span className="card-tag" id="scan-meta">{busy ? 'Buscando…' : summary ? `${current.label} · ${summary.candidates} ítems` : 'Sin búsqueda'}</span>
             </div>
             <ResultGrid cards={[
               { id: 'scan-candidates', label: 'Ítems analizados', value: fmt(summary?.candidates || 0) },
-              { id: 'scan-requests', label: 'Peticiones', value: fmt(summary?.requests || 0) },
-              { id: 'scan-prices', label: 'Precios recibidos', value: fmt(summary?.prices || 0) },
+              { id: 'scan-requests', label: 'Peticiones AODP', value: fmt(summary?.requests || 0) },
+              { id: 'scan-deduplicated', label: 'Solicitudes deduplicadas', value: fmt(summary?.deduplicated || 0) },
+              { id: 'scan-prices', label: 'Filas recibidas', value: fmt(summary?.prices || 0) },
+              { id: 'scan-coverage', label: 'Cobertura AODP', value: summary
+                ? (summary.coverage.requested
+                  ? `${fmt2(summary.coverage.percent)} % (${fmt(summary.coverage.quoted)}/${fmt(summary.coverage.requested)})`
+                  : 'Sin consultas')
+                : '—' },
+              { id: 'scan-missing', label: 'Cotizaciones ausentes', value: fmt(summary?.coverage?.missing || 0) },
               { id: 'scan-rows', label: 'Oportunidades', value: fmt(rows.length) },
             ]} />
             {busy && <div className="progress" id="scan-progress"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>}
           </section>
-          <section className="card">
+          <section className="card" id="scan-opportunities">
             <div className="card-head"><h2>Oportunidades</h2>
+              <span className="card-tag">Top 30 por ganancia neta</span>
               <span className="hint" id="scan-description">{rows.length ? describe(rows[0]) : ''}</span>
             </div>
             <div id="scan-results">
@@ -233,6 +292,8 @@ export default function ScannerView({ meta }) {
             <div className="notes-body">
               <p>Los precios vienen de la API comunitaria de Albion Online Data Project y pueden estar desactualizados. Verificá siempre en el juego.</p>
               <p>Las rutas por Caerleon, Brecilien o el Mercado Negro implican zonas de riesgo; activá «Solo rutas seguras» para excluirlas.</p>
+              <p>Las ventas al Mercado Negro incluyen la tasa de publicación del 2,5 %. La estrategia «Mejora» suma el precio del ítem anterior y sus runas, almas o reliquias.</p>
+              <p>El rastreo se actualiza automáticamente cada 15 minutos mientras Flipping esté abierto; el modo global analiza una muestra de hasta 250 ítems para respetar los límites de la API.</p>
               <p>«Abrir en calculadora» carga la oportunidad con sus precios para que agregues diarios, transporte y otros costes reales.</p>
             </div>
           </details>

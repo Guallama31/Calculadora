@@ -26,47 +26,94 @@ export default function PricesView({ meta }) {
   const [qualityRows, setQualityRows] = React.useState([]);
   const [status, setStatus] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [cacheCount, setCacheCount] = React.useState(null);
+  const [cacheBusy, setCacheBusy] = React.useState(false);
+  const [cacheStatus, setCacheStatus] = React.useState('');
+  const requestId = React.useRef(0);
+
+  const refreshCacheInfo = React.useCallback(async () => {
+    try {
+      setCacheCount(await api.getPriceCacheCount());
+    } catch (error) {
+      setCacheStatus(`No se pudo acceder a la caché local: ${error.message}`);
+    }
+  }, []);
+
+  React.useEffect(() => { void refreshCacheInfo(); }, [refreshCacheInfo]);
 
   React.useEffect(() => {
-    if (pending?.itemId) setItemId(pending.itemId);
+    if (!pending?.itemId) return;
+    const entry = catalog.get(pending.itemId);
+    if (entry) {
+      setItem(entry);
+      setItemId(entry.id);
+    }
   }, [pending?.itemId]);
 
-  async function load() {
+  const load = React.useCallback(async () => {
     if (!item) { setStatus('Elegí un ítem primero.'); return; }
+    const currentRequest = ++requestId.current;
     setBusy(true);
     setStatus('Consultando AODP…');
     try {
       const all = await api.fetchPrices({ server: shared.server, ids: [item.id],
         cities: CITIES.map(c => c.value), quality: shared.quality });
+      if (currentRequest !== requestId.current) return;
       const map = api.indexRows(all);
       const list = CITIES.map(c => {
         const row = api.pick(map, item.id, c.value, shared.quality);
         const sell = api.priceFor(row, 'sell');
         const buy = api.priceFor(row, 'buy');
-        if (!sell && !buy) return null;
         const spread = sell && buy ? sell.price - buy.price : null;
-        return { city: c.value, label: c.label, sell: sell?.price || 0, buy: buy?.price || 0,
+        return {
+          city: c.value, label: c.label, sell: sell?.price ?? null, buy: buy?.price ?? null,
+          sourceSell: sell?.source, sourceBuy: buy?.source,
           spread, roi: spread != null && buy?.price > 0 ? spread / buy.price * 100 : null,
-          ageSell: ageFromDate(sell?.date), ageBuy: ageFromDate(buy?.date) };
-      }).filter(Boolean);
+          ageSell: sell ? ageFromDate(sell.date) : null, ageBuy: buy ? ageFromDate(buy.date) : null };
+      });
       setCityRows(list);
 
       const qualities = await api.fetchPrices({ server: shared.server, ids: [item.id],
         cities: [city], quality: '1,2,3,4,5' });
+      if (currentRequest !== requestId.current) return;
       const qmap = api.indexRows(qualities);
       setQualityRows(QUALITIES.map(q => {
         const row = api.pick(qmap, item.id, city, q.value);
         const sell = api.priceFor(row, 'sell');
         const buy = api.priceFor(row, 'buy');
-        if (!sell && !buy) return null;
-        return { quality: q.label, sell: sell?.price || 0, buy: buy?.price || 0,
-          spread: sell && buy ? sell.price - buy.price : null, age: ageFromDate(sell?.date) };
-      }).filter(Boolean));
-      setStatus('✔ Precios actualizados.');
+        return { quality: q.label, sell: sell?.price ?? null, buy: buy?.price ?? null,
+          sourceSell: sell?.source, sourceBuy: buy?.source,
+          spread: sell && buy ? sell.price - buy.price : null, age: sell ? ageFromDate(sell.date) : null };
+      }));
+      setStatus(`✔ Consulta completada. Las celdas sin cotización indican «No se registra precio». ${api.cacheNotice([...all, ...qualities])}`);
+      await refreshCacheInfo();
     } catch (error) {
-      setStatus('✖ ' + error.message);
-    } finally { setBusy(false); }
+      if (currentRequest === requestId.current) setStatus('✖ ' + error.message);
+    } finally {
+      if (currentRequest === requestId.current) setBusy(false);
+    }
+  }, [item, city, shared.server, shared.quality, refreshCacheInfo]);
+
+  async function clearCache() {
+    setCacheBusy(true);
+    setCacheStatus('');
+    try {
+      await api.clearPriceCache();
+      setCacheCount(0);
+      setCacheStatus('Caché local borrada.');
+    } catch (error) {
+      setCacheStatus(`No se pudo borrar la caché local: ${error.message}`);
+    } finally {
+      setCacheBusy(false);
+    }
   }
+
+  React.useEffect(() => {
+    if (!item) return undefined;
+    requestId.current++;
+    const timer = setTimeout(() => { void load(); }, 250);
+    return () => clearTimeout(timer);
+  }, [item, load]);
 
   return (
     <div className="module-view" data-module="prices">
@@ -80,18 +127,31 @@ export default function PricesView({ meta }) {
           <section className="card">
             <div className="card-head"><h2>Ítem</h2><span className="card-tag">{fmt(catalog.total)} referencias</span></div>
             <ItemSelector id="prices-item" quality={shared.quality} value={itemId}
+              showCategory
               placeholder="Buscar ítem por nombre o ID…"
-              onChange={entry => { setItem(entry); setItemId(entry.id); }} />
+              onChange={entry => {
+                if (!entry) {
+                  setItem(null); setItemId(null); setCityRows([]); setQualityRows([]);
+                  return;
+                }
+                setItem(entry); setItemId(entry.id); setCityRows([]); setQualityRows([]);
+              }} />
           </section>
           <section className="card">
             <div className="card-head"><h2>Consulta</h2></div>
             <Select id="prices-city" label="Ciudad para el detalle de calidad"
-              options={CITIES.slice(0, 7).map(c => ({ value: c.value, label: c.label }))}
+              options={CITIES.map(c => ({ value: c.value, label: c.label }))}
               value={city} onChange={setCity} />
             <button type="button" className="btn primary full" id="prices-load" disabled={busy} onClick={load}>
               ↻ Cargar precios
             </button>
             <p className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')} id="prices-status">{status}</p>
+            <div className="tax-box">
+              <div><span>Cotizaciones guardadas en este dispositivo</span><b id="prices-cache-count">{cacheCount == null ? '—' : fmt(cacheCount)}</b></div>
+              <button type="button" id="prices-clear-cache" className="btn ghost" disabled={cacheBusy || !cacheCount}
+                onClick={clearCache}>Borrar caché local</button>
+              <p className="status" id="prices-cache-status" role="status">{cacheStatus}</p>
+            </div>
           </section>
           <section className="card">
             <div className="card-head"><h2>Lectura de precios</h2></div>
@@ -101,7 +161,7 @@ export default function PricesView({ meta }) {
               <div><span>Spread</span><b>diferencia entre ambos</b></div>
               <div><span>Antigüedad</span><b>frescura del dato</b></div>
             </div>
-            <p className="hint">La app nunca recarga sola: respeta el límite de peticiones de AODP (100 / min, 300 / 5 min).</p>
+            <p className="hint">Se consulta automáticamente al elegir un ítem o cambiar sus filtros. AODP solo recibe datos cuando alguien inspecciona el mercado con su cliente activo. Para ayudar a actualizar precios, <a href="https://github.com/ao-data/albiondata-client/releases" target="_blank" rel="noreferrer">descargá Albion Data Client</a>, recorré las ciudades y volvé a cargar. No se estiman cotizaciones faltantes.</p>
           </section>
         </div>
         <div className="results-col">
@@ -115,12 +175,20 @@ export default function PricesView({ meta }) {
                   <>
                     <DataTable columns={[
                       { label: 'Ciudad', render: r => <strong>{r.label}</strong> },
-                      { label: 'Orden de venta', align: 'right', render: r => r.sell ? fmt(r.sell) : '—' },
-                      { label: 'Venta directa', align: 'right', render: r => r.buy ? fmt(r.buy) : '—' },
+                      { label: 'Orden de venta', align: 'right', render: r => r.sell
+                        ? <>{fmt(r.sell)}{r.sourceSell === 'cache' && <small className="age none">cotización anterior</small>}</>
+                        : 'No se registra precio' },
+                      { label: 'Venta directa', align: 'right', render: r => r.buy
+                        ? <>{fmt(r.buy)}{r.sourceBuy === 'cache' && <small className="age none">cotización anterior</small>}</>
+                        : 'No se registra precio' },
                       { label: 'Spread', align: 'right', render: r => r.spread == null ? '—' : <span className={profitClass(r.spread)}>{fmt(r.spread)}</span> },
                       { label: 'ROI bruto', align: 'right', render: r => r.roi == null ? '—' : fmt2(r.roi) + ' %' },
-                      { label: 'Edad venta', align: 'right', render: r => <span className={`age ${r.ageSell.tone}`}>{esc(r.ageSell.label)}</span> },
-                      { label: 'Edad compra', align: 'right', render: r => <span className={`age ${r.ageBuy.tone}`}>{esc(r.ageBuy.label)}</span> },
+                      { label: 'Edad venta', align: 'right', render: r => r.ageSell
+                        ? <span className={`age ${r.ageSell.tone}`}>{esc(r.ageSell.label)}</span>
+                        : <span className="age none">No se registra precio</span> },
+                      { label: 'Edad compra', align: 'right', render: r => r.ageBuy
+                        ? <span className={`age ${r.ageBuy.tone}`}>{esc(r.ageBuy.label)}</span>
+                        : <span className="age none">No se registra precio</span> },
                     ]} rows={cityRows} />
                     <PriceBars rows={cityRows.filter(r => r.sell).map(r => ({ city: r.label, price: r.sell }))} />
                   </>
@@ -136,10 +204,16 @@ export default function PricesView({ meta }) {
                 {qualityRows.length ? (
                   <DataTable columns={[
                     { label: 'Calidad', render: r => <strong>{r.quality}</strong> },
-                    { label: 'Orden de venta', align: 'right', render: r => r.sell ? fmt(r.sell) : '—' },
-                    { label: 'Venta directa', align: 'right', render: r => r.buy ? fmt(r.buy) : '—' },
+                    { label: 'Orden de venta', align: 'right', render: r => r.sell
+                      ? <>{fmt(r.sell)}{r.sourceSell === 'cache' && <small className="age none">cotización anterior</small>}</>
+                      : 'No se registra precio' },
+                    { label: 'Venta directa', align: 'right', render: r => r.buy
+                      ? <>{fmt(r.buy)}{r.sourceBuy === 'cache' && <small className="age none">cotización anterior</small>}</>
+                      : 'No se registra precio' },
                     { label: 'Spread', align: 'right', render: r => r.spread == null ? '—' : fmt(r.spread) },
-                    { label: 'Edad', align: 'right', render: r => <span className={`age ${r.age.tone}`}>{esc(r.age.label)}</span> },
+                    { label: 'Edad', align: 'right', render: r => r.age
+                      ? <span className={`age ${r.age.tone}`}>{esc(r.age.label)}</span>
+                      : <span className="age none">No se registra precio</span> },
                   ]} rows={qualityRows} />
                 ) : <p className="empty-note">Elegí un ítem y cargá los precios.</p>}
               </div>
