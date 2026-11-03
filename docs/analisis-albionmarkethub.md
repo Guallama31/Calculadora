@@ -43,7 +43,7 @@ Filtros globales **Category / Tier / Enchantment / Quality**, contador «Communi
 | Premium | ✅ 4 % / 8 %, con comparativa lado a lado |
 | Station fee | ✅ Plata por 100 nutrición (`itemValue × 0,1125`) o importe fijo |
 | Modos de precio (compra inmediata / orden, venta directa / orden) | ✅ |
-| Flip, Royal → BM, Craft Trades, Refining Trades | ✅ 4 estrategias |
+| Flip, Royal → BM, Mejora, Craft Trades, Refining Trades | ✅ 5 estrategias |
 | Ganancia / unidad, coste real, venta neta, ROI, margen | ✅ |
 | Antigüedad de los precios | ✅ Badges por minutos/horas + filtro «Edad máxima» |
 | Filtros de resultados (ganancia mínima, ROI mínimo, orden, límite) | ✅ |
@@ -58,11 +58,11 @@ Filtros globales **Category / Tier / Enchantment / Quality**, contador «Communi
 
 ## 3. Cómo se implementó
 
-Se integró como el módulo **Flipping** de la navegación lateral, compartiendo servidor, calidad y Premium con el resto de la app.
+Se integró como el módulo **Flipping** del menú lateral (con las cinco estrategias también en la navegación), compartiendo servidor, calidad y Premium con el resto de la app.
 
 ```
 src/modules/flipping/scanner.js        candidatos, descarga por lotes, evaluación y ranking (JS puro)
-src/modules/flipping/ScannerView.jsx   4 estrategias en pestañas, filtros, resultados y puente
+src/modules/flipping/ScannerView.jsx   5 estrategias en pestañas, filtros, resultados y puente
 src/services/engine.js                calculate() y calculateFlip() con los mismos impuestos
 src/services/bonus.js                 bonus por ciudad (craftingmodifiers.json + world.json) → RRR
 src/modules/crafting/CalculatorView.jsx  recibe la oportunidad por AppContext y la precarga

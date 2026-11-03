@@ -9,27 +9,33 @@ La app pasó por tres etapas: HTML original → HTML + módulos ES nativos → *
 
 | Capa | Tecnología | Responsabilidad |
 |---|---|---|
-| Shell | React + Radix + Tailwind | Barra superior, desplegables, búsqueda global, hoja móvil, sidebar contraíble |
+| Shell | React + Radix + Tailwind | Barra superior, menú lateral desplegable, búsqueda global y hoja móvil |
 | Estado | `AppContext` (React) | Router por hash, preferencias, servidor/calidad/Premium, oportunidad pendiente |
 | Vistas | Componentes `.jsx` por módulo | Configuración + resultados, pestañas horizontales |
 | Lógica | Módulos ES puros en `src/services` | Catálogo, API, motor de cálculo, bonus, formato, storage |
-| Build | Vite + `@vitejs/plugin-react` + `@tailwindcss/vite` | Dev server, bundle, Vitest |
+| Build | Vite + `@vitejs/plugin-react` + `@tailwindcss/vite` | Dev server, bundle, Vitest, ESLint |
 
 La lógica de negocio **no se reescribió**: `catalog.js`, `api.js`, `engine.js`, `bonus.js`, `format.js` y `storage.js` son los mismos módulos sin DOM de la etapa anterior. Solo se reemplazó la capa de UI.
 
 ```text
-index.html
-  └─ src/main.jsx                 createRoot + AppProvider + hojas de estilo
-       └─ src/App.jsx            ApplicationShell + Sidebar + módulo activo
+index.html                            # placeholder «Cargando…» + favicon
+  └─ src/main.jsx                     import() del catálogo + createRoot + ErrorBoundary
+       └─ src/App.jsx                 ApplicationShell + ErrorBoundary + módulo activo
             ├─ src/app/AppContext.jsx       estado compartido y navegación
             ├─ src/components/ui/*          primitivas shadcn (Radix)
-            ├─ src/components/layout/*     barra superior, menús, hoja móvil, logo, datos de nav
-            ├─ src/components/common/*     Tabs, Field, DataTable, ResultCard, ItemSelector
+            ├─ src/components/layout/*     barra superior, menú lateral, hoja móvil, logo, datos de nav
+            ├─ src/components/common/*     Tabs, Field, DataTable, ResultCard, ItemSelector, ErrorBoundary
             ├─ src/components/charts/*     PriceBars / ProfitBars
-            ├─ src/modules/*              CalculatorView, ScannerView, PricesView, registry
+            ├─ src/modules/*              CalculatorView, ScannerView, PricesView, MountsView, registry
             ├─ src/settings/index.js       constantes
-            └─ src/services/*              lógica pura (sin React)
+            ├─ src/services/*              lógica pura (sin React)
+            └─ data/catalog.js             catálogo generado (~5 MB, chunk aparte)
 ```
+
+El catálogo **no** se importa de forma estática: `main.jsx` lo pide con `import()` dinámico, lo
+registra con `initializeCatalog()` y recién entonces monta React. Así el HTML y el CSS pintan
+primero un estado de carga, y los ~5 MB quedan en un chunk `catalog` que el navegador cachea
+entre despliegues de la aplicación. `tests/setup.js` inicializa el catálogo para las pruebas.
 
 Cada entrada de `registry.jsx` es un componente React `{ meta, render implícito }`. `App.jsx` usa `key={active + ':' + pending.seq}` para que al elegir un subménú (por ejemplo «Comparar ciudades») el módulo se remonte y lea las opciones pendientes (`tab`, `strategy`, `itemId`, `opportunity`).
 
@@ -38,14 +44,25 @@ Cada entrada de `registry.jsx` es un componente React `{ meta, render implícito
 Del bloque *ApplicationShell3* se conservaron, adaptados a nuestra app:
 
 - **Barra superior sticky** de 56 px con logo, navegación por grupos, búsqueda y zona derecha.
-- **`NavDropdown`**: un `DropdownMenu` de Radix por grupo (`Producción`, `Especialidades`, `Mercado`), con `children` que apuntan a pestañas o estrategias reales en vez de proyectos de ejemplo.
-- **`MobileNav`**: un `Sheet` (Radix Dialog) con scroll, grupos, separador y grupo de soporte; se cierra al navegar.
+- **`MobileNav`** (menú lateral desplegable): un `Sheet` (Radix Dialog) con scroll, tres grupos
+  (`Producción`, `Especialidades`, `Mercado`), submenús que apuntan a pestañas y estrategias reales,
+  separador y grupo de soporte; se cierra al navegar. Es el **único** menú de navegación y está
+  disponible en cualquier tamaño de pantalla (no hay barra lateral fija).
 - **`GlobalSearch`**: busca módulos e ítems del catálogo en un mismo campo; al elegir un ítem navega a Crafteo con `itemId` y lo preselecciona.
 - **`cn()`** (`clsx` + `tailwind-merge`), `Button`, `Input`, `DropdownMenu*`, `Sheet*`, `ScrollArea`, `Separator`, iconos `lucide-react` y los tokens `@theme` de Tailwind 4 mapeados a nuestra paleta.
 
 Lo que **no** se copió: `NavUser` (avatar, *Account*, *Log out*), el selector de `workspaces`, los datos de `person1`, el logo externo de shadcnblocks y las clases `dark:`. La app no tiene login ni backend, y la marca debe ser exactamente **Calculadora**, sin subtítulos. En su lugar, la zona derecha muestra servidor, calidad y Premium.
 
-La **navegación lateral contraíble** se mantuvo: el botón de la cabecera alterna `.shell.collapsed`, guarda el estado y conserva los `title` de los ítems. Los grupos de la lateral ahora también son plegables.
+Los grupos del menú se definen en `src/components/layout/sidebar-data.js`, que es la única fuente
+de la navegación; `MODULES[].group` en `src/settings/index.js` solo alimenta la insignia del
+encabezado y debe coincidir con esos títulos. El menú incluye las **cinco** estrategias del escáner
+(*Flip*, *Royal → BM*, *Mejora*, *Craft Trades* y *Refining Trades*).
+
+**Barrera de errores.** `ErrorBoundary` (`src/components/common/ErrorBoundary.jsx`) envuelve cada
+módulo en `App.jsx` con `key={active + ':' + pending.seq}`: si una vista lanza durante el render se
+muestra un mensaje con «Reintentar» y «Recargar», la navegación sigue funcionando y, al cambiar de
+módulo, el error se descarta solo. `main.jsx` usa otra barrera para fallos del shell y una pantalla
+de error específica si el catálogo no se puede descargar.
 
 ## 3. Diseño visual
 
@@ -56,7 +73,9 @@ La **navegación lateral contraíble** se mantuvo: el botón de la cabecera alte
 
 ## 4. Catálogo y precios
 
-`tools/generate_catalog.py` descarga `items.json` y `formatted/items.json` de [`ao-data/ao-bin-dumps`](https://github.com/ao-data/ao-bin-dumps) y genera `data/catalog.js` como **módulo ES** (`export const CATALOG`). Contiene los ítems T2–T8 que tienen receta de fabricación en los dumps, con encantamientos disponibles `.0`–`.4`, nombres ES/EN, `itemValue`, materiales (`ret:false`, `max`), recetas alternativas con corazones (`alternateRes`), diarios, `ccat`, `refine` y `upgrade`. Para los refinados encantados registra los IDs de mercado `T4_PLANKS_LEVEL1@1` y sus materiales de receta, aunque no figuren como una receta normal de encantamiento. No es la lista completa de todo objeto del juego: los objetos sin receta de fabricación no se incluyen como resultados seleccionables.
+`tools/generate_catalog.py` descarga `items.json` y `formatted/items.json` de [`ao-data/ao-bin-dumps`](https://github.com/ao-data/ao-bin-dumps) y genera `data/catalog.js` como **módulo ES** (`export const CATALOG`). Contiene los ítems T2–T8 que tienen receta de fabricación en los dumps, con encantamientos disponibles `.0`–`.4`, nombres ES/EN, `itemValue`, materiales (`ret:false`, `max`), recetas alternativas con corazones (`alternateRes`), diarios, `ccat`, `refine` y `upgrade`. Para los refinados encantados registra los IDs de mercado `T4_PLANKS_LEVEL1@1` y sus materiales de receta, aunque no figuren como una receta normal de encantamiento. No es la lista completa de todo objeto del juego: los objetos sin receta de fabricación no se incluyen como resultados seleccionables. 23 entradas (fichas de habilidad y alquimia rara) no traen `itemValue`; la interfaz lo advierte porque, sin ese valor, la nutrición y la tasa de estación quedan en 0.
+
+El módulo se carga con `import()` dinámico (ver §1) y el servidor de desarrollo lo sirve sin transformar para no inflar la respuesta con un sourcemap inline.
 
 Auditoría del catálogo actual contra `ao-bin-dumps` actualizado el 2026-11-02 (commit [`0483dd9`](https://github.com/ao-data/ao-bin-dumps/commit/0483dd97f1581dfaf02eed42f25f5ea2a3cb75e5)): 8.382 entradas, 8.382 IDs únicos y 2.626 IDs base; se añadieron 80 variantes de refinados encantados. Todos los IDs base están en los datos oficiales del juego. La serie Matadragones está incluida: búsqueda en español devuelve 75 variantes de 15 piezas base (armaduras de cabeza, pecho y pies de tiers 4–8, con encantamientos). El problema era que el selector limitaba la búsqueda a 40 coincidencias y la búsqueda global a 8. Ahora ambos muestran 100 por página y permiten ampliar resultados cuando hay más.
 
@@ -69,6 +88,15 @@ La pestaña **Transmutación** rankea las conversiones de recursos T4–T8 al si
 Como el archivo pesa ~5 MB y es ESM puro, `vite.config.js` incluye un pequeño middleware (`catalog-static`) que lo sirve **sin transformar en desarrollo**. Sin esto, Vite le inyecta un sourcemap inline que infla la respuesta a ~28 MB.
 
 `src/services/api.js` consulta `/api/v2/stats/prices/{ids}.json?locations=…&qualities=…` en West, East o Europe, agrupando varios ítems, ciudades y calidades por petición y evitando la caché HTTP del navegador. Deduplica peticiones simultáneas, respeta `RateLimit-Reset` en un `429` y traduce un `TypeError` de `fetch` a un mensaje de posible bloqueo CORS. Las vistas actualizan al seleccionar un ítem o cambiar filtros; el usuario también puede solicitar una actualización manual.
+
+Cada consulta tiene un **tiempo máximo de espera** (`PRICE_REQUEST_TIMEOUT_MS`, 15 s) y acepta una
+`AbortSignal`: CalculatorView, PricesView, BreedingView y el escáner cancelan la petición anterior al
+cambiar de ítem o de filtros y al desmontarse, y el escáner ofrece un botón «Cancelar búsqueda». Al
+cancelar se libera la entrada de deduplicación de inmediato; una cancelación del usuario nunca se
+informa como error ni se responde con la caché. Si vence el tiempo de espera o falla la red, se
+intenta la **caché local en IndexedDB** (`src/services/price-cache.js`): claves por servidor, ítem,
+ciudad y calidad, observaciones de compra y venta con fechas independientes, retención de 90 días y
+depuración cada 24 h. Una fila inválida ya no aborta el lote completo.
 
 | Modo | Campo AODP | Uso |
 |---|---|---|
@@ -114,12 +142,19 @@ En React, `CalculatorView.jsx` guarda la configuración y los precios en estado 
 
 ## 6. Escáner
 
-`src/modules/flipping/scanner.js` (JS puro) selecciona candidatos por tier/encantamiento/categoría/búsqueda, calcula los IDs necesarios, agrupa en lotes de ≤30 IDs respetando el límite de longitud de URL de AODP y evalúa todas las combinaciones de ciudades con el mismo `engine`. Cuatro estrategias:
+`src/modules/flipping/scanner.js` (JS puro) selecciona candidatos por tier/encantamiento/categoría/búsqueda, calcula los IDs necesarios, agrupa en lotes de ≤30 IDs respetando el límite de longitud de URL de AODP y evalúa todas las combinaciones de ciudades con el mismo `engine`. Cinco estrategias:
 
 - **Flip** — comprar barato, vender caro.
 - **Royal → BM** — destino fijo Mercado Negro y venta directa.
+- **Mejora** — comprar el ítem del encantamiento anterior y su runa, alma o reliquia, y vender el
+  ítem resultante. No suma tasa de estación (el encantamiento con runas se resuelve en el inventario
+  y el modelo no le asigna costo de plata); si en tu caso pagás una tarifa, agregala en «Abrir
+  encantamiento».
 - **Craft Trades** — `calculate()` con receta real, RRR de la ciudad y tasa de estación.
 - **Refining Trades** — igual, sobre las recetas con `refine: true`.
+
+Las filas se publican **por unidad**: coste, venta, impuestos, tarifas y ganancia se dividen por las
+unidades producidas, de modo que la columna «Ganancia / u» y las de impuestos son comparables.
 
 Filtros: ganancia mínima, ROI mínimo, antigüedad máxima, orden, límite, rutas seguras, permiso de misma ciudad e inclusión del Mercado Negro. «Abrir en calculadora» pasa la fila por `AppContext` (`opportunity`) y precarga ítem, ciudades, modos, RRR, Focus, tasa de estación y precios.
 
@@ -136,13 +171,28 @@ La calculadora consulta AODP para la cría y el alimento al comprar, y el animal
 ## 8. Verificación
 
 ```bash
-npm run check       # 40 archivos JS/JSX (esbuild + node --check)
+npm run lint        # ESLint (js.configs.recommended + react-hooks + jsx-uses-vars)
+npm run check       # sintaxis de JS/JSX (esbuild + node --check)
 npm test            # pruebas Vitest + Testing Library + jsdom
+npm run test:coverage   # lo mismo con cobertura V8
 npm run build       # bundle de producción
 npm run dev         # servidor en 0.0.0.0:8000
 ```
 
-Las pruebas cubren: marca exacta, barra superior y 10 módulos, colapso persistente, menús desplegables y submenús, hoja móvil, búsqueda global, autocompletado y chips `.0`–`.4`, receta y desglose, impuestos 4/8 %, RRR por ciudad y Focus, carga de precios, `429` y CORS, comparación de ciudades, las 4 estrategias del escáner, puente «Abrir en calculadora», matriz de precios por ciudad y calidad, cálculo de crianza, crías retenidas, precios ausentes/manuales, navegación entre Crianza/Ensillado y precarga de monturas desde búsqueda global, y ausencia de errores de React al recorrer los 10 módulos. El `fetch` de AODP se simula en `tests/fixtures.js`.
+`npm run format` aplica Prettier de forma manual; el código existente todavía no se reformateó para
+no mezclar un diff masivo con los cambios funcionales.
+
+Las pruebas cubren: marca exacta, barra superior y 10 módulos, menú lateral desplegable y submenús,
+hoja móvil, búsqueda global, autocompletado y chips `.0`–`.4`, receta y desglose, impuestos 4/8 %,
+RRR por ciudad y Focus, carga de precios, `429`, CORS, tiempo de espera y cancelación de consultas,
+comparación de ciudades, las 5 estrategias del escáner, puente «Abrir en calculadora», matriz de
+precios por ciudad y calidad, cálculo de crianza, elección de cotización según el modo de venta,
+crías retenidas, precios ausentes/manuales, caché local (retención y depuración), navegación entre
+Crianza/Ensillado, precarga de monturas desde búsqueda global, fórmulas del motor de cálculo y la
+barrera de errores. El `fetch` de AODP se simula en `tests/fixtures.js`.
+
+El repositorio incluye un flujo de GitHub Actions (`.github/workflows/ci.yml`) que ejecuta
+`lint`, `check`, `test` y `build` en cada push a `main` y en cada pull request.
 
 ## 9. Límites conocidos
 

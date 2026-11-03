@@ -21,7 +21,7 @@ Stack: **React 18 + Vite 6 + Tailwind CSS 4 + componentes Radix/shadcn + lucide-
 | **Refinamiento** | Recetas con bonus de ciudad, recetas alternativas con corazones y ranking de transmutación. |
 | **Agricultura**, **Animales**, **Alquimia**, **Cocina** | La calculadora filtrada al catálogo de cada actividad. |
 | **Monturas** | Flujos separados de crianza y ensillado, con precios AODP/manuales, costos y crías promedio. |
-| **Flipping** | Escáner con 4 estrategias en pestañas: *Flip*, *Royal → BM*, *Craft Trades* y *Refining Trades*. |
+| **Flipping** | Escáner con 5 estrategias en pestañas: *Flip*, *Royal → BM*, *Mejora*, *Craft Trades* y *Refining Trades*. |
 | **Precios** | Matriz de precios por ciudad y comparativa por calidad, con antigüedad de cada dato. |
 
 ## Qué se puede configurar
@@ -38,14 +38,20 @@ Stack: **React 18 + Vite 6 + Tailwind CSS 4 + componentes Radix/shadcn + lucide-
 ## Cómo ejecutarla
 
 ```bash
-npm install          # primera vez
+npm install          # primera vez (Node ≥ 20)
 npm run dev          # Vite en http://localhost:8000 (0.0.0.0, apto para preview)
-npm run build        # bundle de producción en dist/
+npm run build        # bundle de producción en dist/ (incluye docs/)
 npm run preview      # sirve dist/ en el puerto 8000
 npm test             # pruebas con Vitest + Testing Library + jsdom
+npm run test:coverage  # lo mismo con cobertura V8
+npm run lint         # ESLint (React, hooks y variables sin usar)
 npm run check        # verifica sintaxis de JS / JSX (esbuild + node --check)
+npm run format       # Prettier sobre src/, tests/ y tools/ (manual)
 npm run catalog      # regenera data/catalog.js desde ao-bin-dumps (Python 3)
 ```
+
+GitHub Actions ejecuta `lint`, `check`, `test` y `build` en cada push a `main` y en cada PR
+(`.github/workflows/ci.yml`).
 
 No se puede abrir `index.html` con doble clic: la app necesita el servidor de Vite para resolver JSX, Tailwind y los módulos.
 
@@ -53,22 +59,23 @@ No se puede abrir `index.html` con doble clic: la app necesita el servidor de Vi
 
 ```
 Calculadora/
-├── index.html                          # #root + /src/main.jsx
+├── index.html                          # #root, estado de carga y favicon
 ├── package.json                        # scripts y dependencias
-├── vite.config.js                      # React, Tailwind, host del preview, Vitest
-├── data/catalog.js                     # módulo ES con 8.382 recetas generadas
+├── vite.config.js                      # React, Tailwind, host del preview, Vitest, copia de docs
+├── eslint.config.js                    # reglas de lint
+├── data/catalog.js                     # módulo ES con 8.382 recetas generadas (chunk aparte)
 ├── src/
-│   ├── main.jsx                        # createRoot + AppProvider
-│   ├── App.jsx                         # shell + módulo activo
+│   ├── main.jsx                        # import() del catálogo + createRoot + AppProvider
+│   ├── App.jsx                         # shell + barrera de errores + módulo activo
 │   ├── app/AppContext.jsx              # router por hash, preferencias, estado compartido
 │   ├── components/
 │   │   ├── ui/                         # Button, Input, DropdownMenu, Sheet, ScrollArea, Separator
 │   │   ├── layout/                     # ApplicationShell, MobileNav,
 │   │   │                               # GlobalSearch, Logo, sidebar-data
-│   │   ├── common/                     # Tabs, Field, DataTable, ResultCard, ItemSelector
+│   │   ├── common/                     # Tabs, Field, DataTable, ResultCard, ItemSelector, ErrorBoundary
 │   │   └── charts/PriceBars.jsx
 │   ├── modules/
-│   │   ├── crafting/CalculatorView.jsx # vista reutilizable de los 8 módulos de producción
+│   │   ├── crafting/CalculatorView.jsx # vista reutilizable de los 7 módulos de producción
 │   │   ├── flipping/                   # scanner.js + ScannerView.jsx
 │   │   ├── prices/PricesView.jsx
 │   │   ├── enchanting/ refining/ farming/ animals/ mounts/ alchemy/ cooking/
@@ -81,13 +88,16 @@ Calculadora/
 │   ├── check.mjs                       # verificación de sintaxis
 │   └── generate_catalog.py             # regenera el catálogo
 ├── tests/                              # setup, fixtures AODP y pruebas de la app
+├── public/favicon.svg
+├── .github/workflows/ci.yml            # lint + check + test + build
 └── docs/
     ├── analisis-albion-analytics.md    # análisis del repositorio de referencia (WPF, histórico)
     ├── analisis-albionmarkethub.md     # revisión de Albion Market Hub
-    └── implementacion.md               # arquitectura, fórmulas y decisiones
+    ├── implementacion.md               # arquitectura, fórmulas y decisiones
+    └── informe-revision-2026-11-03.md  # revisión técnica y correcciones aplicadas
 ```
 
-Todo el estado se guarda en `localStorage` (`calculadora-prefs-v1`): ciudad de crafteo, compra/venta, Focus, bonus diario, colapso de la barra, Premium, servidor, calidad y último ítem.
+Todo el estado se guarda en `localStorage` (`calculadora-prefs-v1`): ciudad de crafteo, compra/venta, Focus, bonus diario, Premium, servidor, calidad y último ítem. Las cotizaciones válidas de AODP se guardan en IndexedDB (`calculadora-market-cache`, retención de 90 días) y se usan como referencia si la API falla o tarda más de 15 s.
 
 ## Fuentes y créditos
 
