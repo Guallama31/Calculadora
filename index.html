@@ -1,13 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calculadora</title>
-  <meta name="description" content="Calculadora de Albion Online para crafteo, encantamiento, refinamiento, crianza y ensillado de monturas, flipping y precios por ciudad.">
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora</title>
+    <meta
+      name="description"
+      content="Calculadora de Albion Online para crafteo, encantamiento, refinamiento, crianza y ensillado de monturas, flipping y precios por ciudad."
+    />
+    <meta name="theme-color" content="#1e5ed0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      /* Estilos mínimos del estado de carga: se aplican antes de que llegue el CSS del bundle. */
+      html,
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #1b2740;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      .boot {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+      }
+      .boot p {
+        margin: 0;
+        font-size: 14px;
+        color: #6b7893;
+      }
+      .boot-spinner {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid #dbe4f5;
+        border-top-color: #1e5ed0;
+        animation: boot-spin 0.8s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-spinner {
+          animation-duration: 2.4s;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot" data-boot role="status" aria-live="polite">
+        <div class="boot-spinner" aria-hidden="true"></div>
+        <p>Cargando el catálogo de recetas…</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

@@ -19,7 +19,11 @@ async function walk(dir) {
 
 let failures = 0;
 for (const dir of DIRS) {
-  try { await walk(join(ROOT, dir)); } catch { /* carpeta opcional */ }
+  try {
+    await walk(join(ROOT, dir));
+  } catch {
+    /* carpeta opcional */
+  }
 }
 for (const file of files) {
   try {

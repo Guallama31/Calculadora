@@ -11,8 +11,10 @@ export const SERVERS = [
 ];
 
 export const QUALITIES = [
-  { value: '1', label: 'Normal' }, { value: '2', label: 'Buena' },
-  { value: '3', label: 'Destacada' }, { value: '4', label: 'Excelente' },
+  { value: '1', label: 'Normal' },
+  { value: '2', label: 'Buena' },
+  { value: '3', label: 'Destacada' },
+  { value: '4', label: 'Excelente' },
   { value: '5', label: 'Obra maestra' },
 ];
 
@@ -48,22 +50,96 @@ export const TAX = Object.freeze({
 export const CATEGORIES = ITEM_CATEGORIES;
 
 export const MODULES = [
-  { id: 'crafting', label: 'Crafteo', icon: '⚒', group: 'Producción', description: 'Calculá la rentabilidad real de fabricar un ítem: receta, materiales, impuestos, diarios y tasa de estación.' },
-  { id: 'enchanting', label: 'Encantamiento', icon: '✦', group: 'Producción', description: 'Compará el coste de mejorar un ítem con runas, almas o reliquias frente al precio del ítem encantado.' },
-  { id: 'refining', label: 'Refinamiento', icon: '▤', group: 'Producción', description: 'Refiná recursos en la ciudad con bonus de producción y calculá la devolución por RRR.' },
-  { id: 'farming', label: 'Agricultura', icon: '❀', group: 'Producción', description: 'Recetas de cultivo y productos agrícolas con precios por ciudad.' },
-  { id: 'animals', label: 'Animales', icon: '❖', group: 'Producción', description: 'Calculadora de margen para cría y venta de animales con tus propios valores.' },
-  { id: 'mounts', label: 'Monturas', icon: '◈', group: 'Producción', description: 'Calculá la rentabilidad de criar animales y ensillar monturas con precios de mercado.' },
-  { id: 'alchemy', label: 'Alquimia', icon: '⚗', group: 'Producción', description: 'Pociones y consumibles alquímicos: recetas, impuestos y ganancia.' },
-  { id: 'cooking', label: 'Cocina', icon: '◍', group: 'Producción', description: 'Comida y platos cocinados con recetas reales del juego.' },
-  { id: 'flipping', label: 'Flipping', icon: '⇄', group: 'Mercado', description: 'Encontrá oportunidades: flip entre ciudades, Royal → Mercado Negro, crafteo y refinamiento.' },
-  { id: 'prices', label: 'Precios', icon: '▦', group: 'Mercado', description: 'Precios de un ítem en todas las ciudades, con antigüedad y comparativa visual.' },
+  {
+    id: 'crafting',
+    label: 'Crafteo',
+    icon: '⚒',
+    group: 'Producción',
+    description:
+      'Calculá la rentabilidad real de fabricar un ítem: receta, materiales, impuestos, diarios y tasa de estación.',
+  },
+  {
+    id: 'enchanting',
+    label: 'Encantamiento',
+    icon: '✦',
+    group: 'Producción',
+    description:
+      'Compará el coste de mejorar un ítem con runas, almas o reliquias frente al precio del ítem encantado.',
+  },
+  {
+    id: 'refining',
+    label: 'Refinamiento',
+    icon: '▤',
+    group: 'Producción',
+    description: 'Refiná recursos en la ciudad con bonus de producción y calculá la devolución por RRR.',
+  },
+  {
+    id: 'farming',
+    label: 'Agricultura',
+    icon: '❀',
+    group: 'Especialidades',
+    description: 'Recetas de cultivo y productos agrícolas con precios por ciudad.',
+  },
+  {
+    id: 'animals',
+    label: 'Animales',
+    icon: '❖',
+    group: 'Especialidades',
+    description: 'Calculadora de margen para cría y venta de animales con tus propios valores.',
+  },
+  {
+    id: 'mounts',
+    label: 'Monturas',
+    icon: '◈',
+    group: 'Especialidades',
+    description: 'Calculá la rentabilidad de criar animales y ensillar monturas con precios de mercado.',
+  },
+  {
+    id: 'alchemy',
+    label: 'Alquimia',
+    icon: '⚗',
+    group: 'Especialidades',
+    description: 'Pociones y consumibles alquímicos: recetas, impuestos y ganancia.',
+  },
+  {
+    id: 'cooking',
+    label: 'Cocina',
+    icon: '◍',
+    group: 'Especialidades',
+    description: 'Comida y platos cocinados con recetas reales del juego.',
+  },
+  {
+    id: 'flipping',
+    label: 'Flipping',
+    icon: '⇄',
+    group: 'Mercado',
+    description:
+      'Encontrá oportunidades: flip entre ciudades, Royal → Mercado Negro, mejora de encantamiento, crafteo y refinamiento.',
+  },
+  {
+    id: 'prices',
+    label: 'Precios',
+    icon: '▦',
+    group: 'Mercado',
+    description: 'Precios de un ítem en todas las ciudades, con antigüedad y comparativa visual.',
+  },
 ];
 
-export const GROUPS = ['Producción', 'Mercado'];
+/* Los grupos visibles se definen en `components/layout/sidebar-data.js`, que es
+   la única fuente de la navegación; `MODULES[].group` alimenta la insignia del
+   encabezado y debe coincidir con esos títulos. */
 export const DEFAULTS = {
-  server: 'west', quality: '1', premium: true,
-  craftCity: 'Thetford', buyCity: 'Martlock', sellCity: 'Lymhurst',
-  buyMode: 'instant', sellMode: 'order', rrrMode: 'auto',
-  focus: false, dailyBonus: 0, stationFee: 0, syncBuyCity: true,
+  server: 'west',
+  quality: '1',
+  premium: true,
+  craftCity: 'Thetford',
+  buyCity: 'Martlock',
+  sellCity: 'Lymhurst',
+  buyMode: 'instant',
+  sellMode: 'order',
+  rrrMode: 'auto',
+  focus: false,
+  dailyBonus: 0,
+  stationFee: 0,
+  syncBuyCity: true,
 };

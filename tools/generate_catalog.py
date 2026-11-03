@@ -2,8 +2,10 @@
 """Genera data/catalog.js a partir de los dumps públicos de ao-bin-dumps.
 
 Uso:
-    python3 tools/generate_catalog.py                      # descarga los dumps desde la API de GitHub
+    python3 tools/generate_catalog.py                      # descarga los dumps del commit fijado en REF
+    python3 tools/generate_catalog.py --ref <sha>          # usa otro commit de ao-bin-dumps
     python3 tools/generate_catalog.py --full /tmp/items.json --index /tmp/formatted_items.json
+    python3 tools/generate_catalog.py --out /tmp/catalog.js   # escribe en otra ruta
 
 Fuentes (datos del juego, propiedad de Sandbox Interactive):
     https://github.com/ao-data/ao-bin-dumps/blob/master/items.json
@@ -37,7 +39,11 @@ import tempfile
 import urllib.request
 
 REPO = "ao-data/ao-bin-dumps"
-REF = "master"
+# Commit del dump con el que se generó data/catalog.js. Un REF móvil (por ejemplo
+# "master") hacía que dos regeneraciones del mismo día produjeran catálogos
+# distintos sin dejar rastro: fijarlo hace el resultado reproducible.
+# Al actualizar el catálogo hay que cambiar el SHA y volver a ejecutar este script.
+REF = "0483dd97f1581dfaf02eed42f25f5ea2a3cb75e5"
 FULL_PATH = "items.json"
 INDEX_PATH = "formatted/items.json"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "catalog.js")
@@ -93,10 +99,14 @@ def download_dump(path, dest):
 
 
 def main():
+    global REF
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--full", help="ruta local a items.json (dump completo)")
     parser.add_argument("--index", help="ruta local a formatted/items.json (nombres)")
+    parser.add_argument("--ref", default=REF, help=f"commit de {REPO} (por defecto {REF})")
+    parser.add_argument("--out", default=OUT, help="ruta del catálogo generado")
     args = parser.parse_args()
+    REF = args.ref
 
     if args.full and args.index:
         full_path, index_path = args.full, args.index
@@ -148,6 +158,16 @@ def main():
     def localized(uid, lang):
         entry = names.get(uid, {})
         return entry.get(lang) or entry.get("ES-ES") or entry.get("EN-US") or uid
+
+    def untranslated(*uids):
+        """True si el dump no trae nombre en español.
+
+        Los mapas de mazmorra (T*_RANDOM_DUNGEON_*_TOKEN*) y algunas monturas
+        de evento no existen en formatted/items.json o no tienen
+        <LocalizedNames>, así que su nombre visible es el propio ID. Se marca
+        la entrada para que la interfaz lo indique en vez de fingir un nombre.
+        """
+        return any(uid and not names.get(uid, {}).get("ES-ES") for uid in uids)
 
     def market_id(resource_id, level):
         """El dump usa T5_PLANKS_LEVEL1; el mercado usa T5_PLANKS_LEVEL1@1."""
@@ -322,6 +342,7 @@ def main():
                 **({"alternateRes": alternate_resources} if alternate_resources else {}),
                 "upgrade": upgrade_at(data, level),
                 "journal": journal,
+                **({"untranslated": True} if untranslated(base_id) else {}),
             })
 
     catalog.sort(key=lambda x: (x["base"], x["lvl"]))
@@ -382,6 +403,7 @@ def main():
                  if entry.get("@favorite")),
                 0,
             ),
+            **(({"untranslated": True} if untranslated(uid, grown_id, favorite_food_id) else {})),
         })
     mount_breeding.sort(key=lambda item: (item["tier"], item["es"]))
 
@@ -397,15 +419,20 @@ def main():
             "tier": int(num(data.get("@tier"))),
             "nutrition": nutrition,
             "category": food_category,
+            **({"untranslated": True} if untranslated(uid) else {}),
         })
     mount_foods.sort(key=lambda item: (item["tier"], item["es"], item["id"]))
 
     if not mount_breeding or not mount_foods:
         raise ValueError("No se pudieron generar los datos de crianza de monturas.")
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as handle:
-        handle.write("/* Generado por tools/generate_catalog.py desde ao-bin-dumps. No editar a mano. */\n")
+    out_path = args.out
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as handle:
+        handle.write(
+            f"/* Generado por tools/generate_catalog.py desde {REPO}@{REF}. "
+            "No editar a mano. */\n"
+        )
         handle.write("export const CATALOG = ")
         json.dump(catalog, handle, ensure_ascii=False, separators=(",", ":"))
         handle.write(";\nexport const MOUNT_BREEDING = ")
@@ -413,8 +440,11 @@ def main():
         handle.write(";\nexport const MOUNT_FOODS = ")
         json.dump(mount_foods, handle, ensure_ascii=False, separators=(",", ":"))
         handle.write(";\n")
+    sin_nombre = sum(1 for item in catalog if item.get("untranslated"))
     print(f"Listo: {len(catalog)} recetas, {len(mount_breeding)} animales y "
-          f"{len(mount_foods)} alimentos -> {OUT} ({os.path.getsize(OUT) / 1024 / 1024:.2f} MB)")
+          f"{len(mount_foods)} alimentos -> {out_path} "
+          f"({os.path.getsize(out_path) / 1024 / 1024:.2f} MB) desde {REF}")
+    print(f"  {sin_nombre} entradas sin nombre en el dump (marcadas como untranslated)")
 
 
 if __name__ == "__main__":

@@ -56,18 +56,15 @@ export function calculateBreeding({
   const grownTax = ceil(grownRevenue * salesTaxRate);
   const offspringTax = offspringSold ? ceil(offspringGross * salesTaxRate) : 0;
   const grownSetupFee = sellMode === 'order' ? ceil(grownRevenue * TAX.setup) : 0;
-  const offspringSetupFee = offspringSold && sellMode === 'order'
-    ? ceil(offspringGross * TAX.setup) : 0;
+  const offspringSetupFee = offspringSold && sellMode === 'order' ? ceil(offspringGross * TAX.setup) : 0;
   const salesTax = grownTax + offspringTax;
   const setupFee = grownSetupFee + offspringSetupFee;
   const grownNetRevenue = round2(grownRevenue - grownTax - grownSetupFee);
-  const offspringNetRevenue = offspringSold
-    ? round2(offspringGross - offspringTax - offspringSetupFee)
-    : 0;
+  const offspringNetRevenue = offspringSold ? round2(offspringGross - offspringTax - offspringSetupFee) : 0;
   const retainedOffspringValue = offspringSold ? 0 : offspringGross;
   const revenue = round2(grownNetRevenue + offspringNetRevenue);
   const profit = round2(revenue - totalCosts);
-  const roi = totalCosts > 0 ? round2(profit / totalCosts * 100) : 0;
+  const roi = totalCosts > 0 ? round2((profit / totalCosts) * 100) : 0;
   const growthDays = Number(animal?.growTime) > 0 ? Number(animal.growTime) / 86400 : 0;
 
   return {

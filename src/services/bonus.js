@@ -2,18 +2,99 @@
 import { TAX } from '../settings/index.js';
 
 const CITY_BONUS = {
-  Thetford: { refining: .18, crafting: .18, mods: { ore: .40, meat_pig: .10, mace: .15, naturestaff: .15, firestaff: .15, leather_armor: .15, cloth_helmet: .15 } },
-  Lymhurst: { refining: .18, crafting: .18, mods: { fiber: .40, meat_goose: .10, sword: .15, bow: .15, arcanestaff: .15, leather_helmet: .15, leather_shoes: .15 } },
-  Bridgewatch: { refining: .18, crafting: .18, mods: { rock: .40, meat_goat: .10, crossbow: .15, dagger: .15, cursestaff: .15, plate_armor: .15, cloth_shoes: .15 } },
-  Martlock: { refining: .18, crafting: .18, mods: { hide: .40, meat_cow: .10, axe: .15, quarterstaff: .15, froststaff: .15, plate_shoes: .15, offhand: .15 } },
-  'Fort Sterling': { refining: .18, crafting: .18, mods: { wood: .40, meat_chicken: .10, meat_sheep: .10, hammer: .15, spear: .15, holystaff: .15, plate_helmet: .15, cloth_armor: .15 } },
-  Caerleon: { refining: .18, crafting: .18, mods: { gatherergear: .15, tools: .15, food: .15, knuckles: .15, shapeshifterstaff: .15 } },
-  Brecilien: { refining: .18, crafting: .18, mods: { cape: .15, bag: .15, potion: .15 } },
-  Hideout: { refining: .15, crafting: .18, mods: { axe: .15, crossbow: .15, hammer: .15, mace: .15, sword: .15, knuckles: .15, plate_helmet: .15, plate_armor: .15, plate_shoes: .15 } },
+  Thetford: {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: {
+      ore: 0.4,
+      meat_pig: 0.1,
+      mace: 0.15,
+      naturestaff: 0.15,
+      firestaff: 0.15,
+      leather_armor: 0.15,
+      cloth_helmet: 0.15,
+    },
+  },
+  Lymhurst: {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: {
+      fiber: 0.4,
+      meat_goose: 0.1,
+      sword: 0.15,
+      bow: 0.15,
+      arcanestaff: 0.15,
+      leather_helmet: 0.15,
+      leather_shoes: 0.15,
+    },
+  },
+  Bridgewatch: {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: {
+      rock: 0.4,
+      meat_goat: 0.1,
+      crossbow: 0.15,
+      dagger: 0.15,
+      cursestaff: 0.15,
+      plate_armor: 0.15,
+      cloth_shoes: 0.15,
+    },
+  },
+  Martlock: {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: {
+      hide: 0.4,
+      meat_cow: 0.1,
+      axe: 0.15,
+      quarterstaff: 0.15,
+      froststaff: 0.15,
+      plate_shoes: 0.15,
+      offhand: 0.15,
+    },
+  },
+  'Fort Sterling': {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: {
+      wood: 0.4,
+      meat_chicken: 0.1,
+      meat_sheep: 0.1,
+      hammer: 0.15,
+      spear: 0.15,
+      holystaff: 0.15,
+      plate_helmet: 0.15,
+      cloth_armor: 0.15,
+    },
+  },
+  Caerleon: {
+    refining: 0.18,
+    crafting: 0.18,
+    mods: { gatherergear: 0.15, tools: 0.15, food: 0.15, knuckles: 0.15, shapeshifterstaff: 0.15 },
+  },
+  Brecilien: { refining: 0.18, crafting: 0.18, mods: { cape: 0.15, bag: 0.15, potion: 0.15 } },
+  Hideout: {
+    refining: 0.15,
+    crafting: 0.18,
+    mods: {
+      axe: 0.15,
+      crossbow: 0.15,
+      hammer: 0.15,
+      mace: 0.15,
+      sword: 0.15,
+      knuckles: 0.15,
+      plate_helmet: 0.15,
+      plate_armor: 0.15,
+      plate_shoes: 0.15,
+    },
+  },
   Island: { refining: 0, crafting: 0, mods: {} },
 };
 
-export function cityData(city) { return CITY_BONUS[city] || CITY_BONUS.Island; }
+export function cityData(city) {
+  return CITY_BONUS[city] || CITY_BONUS.Island;
+}
 
 export function bonusFor({ city, ccat = '', isRefining = false, focus = false, dailyBonusPct = 0 }) {
   const data = cityData(city);
@@ -22,7 +103,7 @@ export function bonusFor({ city, ccat = '', isRefining = false, focus = false, d
   const focusBonus = focus ? TAX.focusBonus : 0;
   const daily = Math.max(0, Number(dailyBonusPct) || 0) / 100;
   const total = Math.max(0, base + modifier + focusBonus + daily);
-  return { base, modifier, focus: focusBonus, daily, total, rrrPct: total / (1 + total) * 100 };
+  return { base, modifier, focus: focusBonus, daily, total, rrrPct: (total / (1 + total)) * 100 };
 }
 
 export function bestCityFor(ccat, isRefining = false) {

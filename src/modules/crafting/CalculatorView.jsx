@@ -1,11 +1,11 @@
-/* Vista de calculadora reutilizable por los 8 módulos de producción (React). */
+/* Vista de calculadora reutilizable por los 7 módulos de producción (React). */
 import * as React from 'react';
-import { CITIES, CRAFT_CITIES, TAX } from '../../settings/index.js';
+import { CITIES, CRAFT_CITIES } from '../../settings/index.js';
 import * as catalog from '../../services/catalog.js';
 import * as api from '../../services/api.js';
 import * as engine from '../../services/engine.js';
 import { bonusFor, bestCityFor, cityLabel } from '../../services/bonus.js';
-import { esc, fmt, fmt1, fmt2, ageFromDate } from '../../services/format.js';
+import { esc, fmt, fmt2, ageFromDate } from '../../services/format.js';
 import { useApp } from '../../app/AppContext.jsx';
 import { Select, NumberField, Toggle } from '../../components/common/Field.jsx';
 import { Tabs } from '../../components/common/Tabs.jsx';
@@ -18,7 +18,10 @@ import { cn } from '../../lib/utils.js';
 import TransmutationView from './TransmutationView.jsx';
 
 const CITY_OPTIONS = CITIES.map(c => ({ value: c.value, label: c.label }));
-const TABS = [{ id: 'calc', label: 'Calculadora' }, { id: 'cities', label: 'Comparar ciudades' }];
+const TABS = [
+  { id: 'calc', label: 'Calculadora' },
+  { id: 'cities', label: 'Comparar ciudades' },
+];
 const REFINING_TYPES = [
   { value: 'wood', label: 'Madera · tablas' },
   { value: 'ore', label: 'Mineral · lingotes' },
@@ -33,38 +36,55 @@ function Age({ value, manual, missing, city, source }) {
   if (missing) return <span className="age none">No se registra precio</span>;
   if (!value) return <span className="age none">sin dato</span>;
   const a = ageFromDate(value);
-  return <span className={`age ${a.tone}`}>
-    {source === 'cache' ? 'cotización anterior · ' : ''}{city ? `${city} · ` : ''}{a.label}
-  </span>;
+  return (
+    <span className={`age ${a.tone}`}>
+      {source === 'cache' ? 'cotización anterior · ' : ''}
+      {city ? `${city} · ` : ''}
+      {a.label}
+    </span>
+  );
 }
 
 function lowestRecordedPrice(map, id, cities, quality, mode) {
   const quotes = cities.map(city => api.priceAt(map, id, city, quality, mode)).filter(Boolean);
   if (!quotes.length) return null;
-  return quotes.reduce((lowest, quote) => quote.price < lowest.price ? quote : lowest);
+  return quotes.reduce((lowest, quote) => (quote.price < lowest.price ? quote : lowest));
+}
+
+/* Configuración inicial del formulario a partir de las preferencias guardadas. */
+function initialConfig(prefs) {
+  return {
+    craftCity: prefs.craftCity || 'Thetford',
+    syncBuy: prefs.syncBuyCity !== false,
+    runs: 1,
+    rrrMode: prefs.rrrMode || 'auto',
+    rrrPreset: '15.2',
+    rrr: 15.2,
+    focus: !!prefs.focus,
+    dailyBonus: prefs.dailyBonus || 0,
+    stationFee: prefs.stationFee || 0,
+    buyCity: prefs.buyCity || 'Martlock',
+    buyMode: prefs.buyMode || 'instant',
+    buyOrderFee: false,
+    sellCity: prefs.sellCity || 'Lymhurst',
+    sellMode: prefs.sellMode || 'order',
+    journal: false,
+  };
 }
 
 export default function CalculatorView({
-  moduleId, scopeLabel = 'Catálogo completo', filter = null, meta, showModuleHead = true,
+  moduleId,
+  scopeLabel = 'Catálogo completo',
+  filter = null,
+  meta,
+  showModuleHead = true,
 }) {
-  const { shared, prefs, setPrefs, pending, navigate } = useApp();
+  const { shared, prefs, setPrefs, pending } = useApp();
   const Icon = MODULE_ICONS[moduleId];
   const isEnchanting = moduleId === 'enchanting';
   const isRefining = moduleId === 'refining';
-  const tabs = isRefining
-    ? [...TABS, { id: 'transmutation', label: 'Transmutación' }]
-    : TABS;
+  const tabs = isRefining ? [...TABS, { id: 'transmutation', label: 'Transmutación' }] : TABS;
   const showSellCityPrices = moduleId === 'crafting' || moduleId === 'enchanting';
-  const initialCfg = React.useMemo(() => ({
-    craftCity: prefs.craftCity || 'Thetford', syncBuy: prefs.syncBuyCity !== false,
-    runs: 1, rrrMode: prefs.rrrMode || 'auto', rrrPreset: '15.2', rrr: 15.2,
-    focus: !!prefs.focus, dailyBonus: prefs.dailyBonus || 0,
-    stationFee: prefs.stationFee || 0,
-    buyCity: prefs.buyCity || 'Martlock', buyMode: prefs.buyMode || 'instant', buyOrderFee: false,
-    sellCity: prefs.sellCity || 'Lymhurst', sellMode: prefs.sellMode || 'order',
-    journal: false,
-  }), []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const [item, setItem] = React.useState(null);
   const [refiningType, setRefiningType] = React.useState('');
   const [refiningTier, setRefiningTier] = React.useState('');
@@ -72,7 +92,9 @@ export default function CalculatorView({
   const [useHeartRecipe, setUseHeartRecipe] = React.useState(false);
   const [enchantBase, setEnchantBase] = React.useState(null);
   const [baseMode, setBaseMode] = React.useState('buy');
-  const [cfg, setCfg] = React.useState(initialCfg);
+  /* Una sola vez, con las preferencias vigentes al abrir el módulo: incluir
+     `prefs` en las dependencias reiniciaría el formulario. */
+  const [cfg, setCfg] = React.useState(() => initialConfig(prefs));
   const [prices, setPrices] = React.useState({});
   const [manualPrices, setManualPrices] = React.useState({});
   const [saleQuotes, setSaleQuotes] = React.useState(null);
@@ -84,44 +106,51 @@ export default function CalculatorView({
   const [compareBusy, setCompareBusy] = React.useState(false);
   const autoPriceRequest = React.useRef('');
   const priceLoadId = React.useRef(0);
+  const priceAbort = React.useRef(null);
+  const compareAbort = React.useRef(null);
 
-  const refiningEntries = React.useMemo(
-    () => catalog.entries.filter(entry => entry.refine),
-    [],
-  );
-  const refiningTierOptions = [...new Set(refiningEntries
-    .filter(entry => entry.ccat === refiningType && entry.lvl === 0)
-    .map(entry => entry.tier))]
+  const refiningEntries = React.useMemo(() => catalog.entries.filter(entry => entry.refine), []);
+  const refiningTierOptions = [
+    ...new Set(
+      refiningEntries
+        .filter(entry => entry.ccat === refiningType && entry.lvl === 0)
+        .map(entry => entry.tier),
+    ),
+  ]
     .sort((a, b) => a - b)
     .map(tier => ({ value: String(tier), label: `T${tier}` }));
-  const refiningEnchantmentOptions = [...new Set(refiningEntries
-    .filter(entry => entry.ccat === refiningType && entry.tier === Number(refiningTier))
-    .map(entry => entry.lvl))]
+  const refiningEnchantmentOptions = [
+    ...new Set(
+      refiningEntries
+        .filter(entry => entry.ccat === refiningType && entry.tier === Number(refiningTier))
+        .map(entry => entry.lvl),
+    ),
+  ]
     .sort((a, b) => a - b)
     .map(level => ({
       value: String(level),
       label: level === 0 ? '.0 · Sin encantamiento' : `.${level}`,
     }));
 
-  const enchantmentOptions = React.useMemo(
-    () => {
-      if (!enchantBase) return [];
-      const variants = catalog.enchantmentVariants(enchantBase.base);
-      const sequential = [];
-      for (let level = 1; variants.some(option => option.lvl === level); level += 1) {
-        sequential.push(variants.find(option => option.lvl === level));
-      }
-      return sequential;
-    },
-    [enchantBase],
-  );
+  const enchantmentOptions = React.useMemo(() => {
+    if (!enchantBase) return [];
+    const variants = catalog.enchantmentVariants(enchantBase.base);
+    const sequential = [];
+    for (let level = 1; variants.some(option => option.lvl === level); level += 1) {
+      sequential.push(variants.find(option => option.lvl === level));
+    }
+    return sequential;
+  }, [enchantBase]);
   const recipeResources = React.useMemo(() => {
     if (!item) return [];
     if (isRefining) return useHeartRecipe && item.alternateRes ? item.alternateRes : item.res;
     if (!isEnchanting) return item.res;
-    const baseResources = baseMode === 'buy'
-      ? (enchantBase ? [{ id: enchantBase.id, es: enchantBase.es, q: 1, ret: false, kind: 'base' }] : [])
-      : (enchantBase?.res || []).map(resource => ({ ...resource, kind: 'craft' }));
+    const baseResources =
+      baseMode === 'buy'
+        ? enchantBase
+          ? [{ id: enchantBase.id, es: enchantBase.es, q: 1, ret: false, kind: 'base' }]
+          : []
+        : (enchantBase?.res || []).map(resource => ({ ...resource, kind: 'craft' }));
     const enchantResources = enchantmentOptions
       .filter(option => option.lvl <= item.lvl)
       .map((option, index) => ({
@@ -134,15 +163,19 @@ export default function CalculatorView({
   }, [item, isEnchanting, isRefining, useHeartRecipe, enchantBase, baseMode, enchantmentOptions]);
 
   const currentTarget = key => targets().find(target => target.key === key) || null;
-  const manualKey = target => JSON.stringify([
-    shared.server, shared.quality, target.id, target.city, target.mode,
-  ]);
+  const manualKey = target =>
+    JSON.stringify([shared.server, shared.quality, target.id, target.city, target.mode]);
   const priceRecord = key => {
     const target = currentTarget(key);
     const override = target ? manualPrices[`${key}|${manualKey(target)}`] : undefined;
-    if (override !== undefined) return {
-      ...prices[key], value: override, manual: true, source: 'manual', missing: false,
-    };
+    if (override !== undefined)
+      return {
+        ...prices[key],
+        value: override,
+        manual: true,
+        source: 'manual',
+        missing: false,
+      };
     const record = prices[key];
     if (target && record?.context && record.context !== manualKey(target)) {
       return { ...record, value: '', date: null, missing: true };
@@ -177,9 +210,16 @@ export default function CalculatorView({
       return next;
     });
     const persist = {
-      craftCity: 'craftCity', syncBuy: 'syncBuyCity', focus: 'focus', dailyBonus: 'dailyBonus',
-      stationFee: 'stationFee', buyCity: 'buyCity', sellCity: 'sellCity',
-      buyMode: 'buyMode', sellMode: 'sellMode', rrrMode: 'rrrMode',
+      craftCity: 'craftCity',
+      syncBuy: 'syncBuyCity',
+      focus: 'focus',
+      dailyBonus: 'dailyBonus',
+      stationFee: 'stationFee',
+      buyCity: 'buyCity',
+      sellCity: 'sellCity',
+      buyMode: 'buyMode',
+      sellMode: 'sellMode',
+      rrrMode: 'rrrMode',
     }[key];
     if (persist) setPrefs({ [persist]: value });
   };
@@ -202,8 +242,8 @@ export default function CalculatorView({
       } else applyOpportunity(p.opportunity);
       return;
     }
-    const wanted = p.itemId || prefs[`lastItem:${moduleId}`]
-      || (moduleId === 'crafting' ? prefs.lastItem : null);
+    const wanted =
+      p.itemId || prefs[`lastItem:${moduleId}`] || (moduleId === 'crafting' ? prefs.lastItem : null);
     if (wanted) {
       const entry = catalog.get(wanted);
       if (isEnchanting) {
@@ -221,13 +261,17 @@ export default function CalculatorView({
       if (item) setItem(null);
       return;
     }
-    const selected = refiningEntries.find(entry => entry.ccat === refiningType
-      && entry.tier === Number(refiningTier) && entry.lvl === Number(refiningLevel));
+    const selected = refiningEntries.find(
+      entry =>
+        entry.ccat === refiningType &&
+        entry.tier === Number(refiningTier) &&
+        entry.lvl === Number(refiningLevel),
+    );
     if (selected?.id !== item?.id) {
       if (selected) applyItem(selected);
       else setItem(null);
     }
-  }, [isRefining, refiningEntries, refiningType, refiningTier, refiningLevel, item]);
+  }, [isRefining, refiningEntries, refiningType, refiningTier, refiningLevel, item]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyItem(entry) {
     if (!entry) {
@@ -280,12 +324,17 @@ export default function CalculatorView({
     const sellOk = CITY_OPTIONS.some(c => c.value === row.sellCity);
     setCfg(c => ({
       ...c,
-      craftCity: craftOk ? row.craftCity : c.craftCity, syncBuy: false,
-      buyCity: buyOk ? (row.materialPrices?.[0]?.city || row.buyCity) : c.buyCity,
+      craftCity: craftOk ? row.craftCity : c.craftCity,
+      syncBuy: false,
+      buyCity: buyOk ? row.materialPrices?.[0]?.city || row.buyCity : c.buyCity,
       sellCity: sellOk ? row.sellCity : c.sellCity,
-      buyMode: row.buyMode || c.buyMode, sellMode: row.sellMode || c.sellMode,
-      focus: !!row.focus, dailyBonus: row.dailyBonus || 0,
-      stationFee: row.stationFeePer100 || 0, rrrMode: 'manual', rrr: row.rrr,
+      buyMode: row.buyMode || c.buyMode,
+      sellMode: row.sellMode || c.sellMode,
+      focus: !!row.focus,
+      dailyBonus: row.dailyBonus || 0,
+      stationFee: row.stationFeePer100 || 0,
+      rrrMode: 'manual',
+      rrr: row.rrr,
     }));
     const next = { [`sell:${entry.id}`]: { value: row.sellPrice, date: row.sellDate, manual: false } };
     (row.materialPrices || []).forEach(p => {
@@ -297,10 +346,15 @@ export default function CalculatorView({
 
   /* ---- RRR ---- */
   const bonus = React.useMemo(() => {
-    const city = cfg.craftCity === 'auto'
-      ? (item ? bestCityFor(item.ccat, item.refine) : 'Thetford') : cfg.craftCity;
-    return bonusFor({ city, ccat: item?.ccat || '', isRefining: !!item?.refine,
-      focus: cfg.focus, dailyBonusPct: cfg.dailyBonus });
+    const city =
+      cfg.craftCity === 'auto' ? (item ? bestCityFor(item.ccat, item.refine) : 'Thetford') : cfg.craftCity;
+    return bonusFor({
+      city,
+      ccat: item?.ccat || '',
+      isRefining: !!item?.refine,
+      focus: cfg.focus,
+      dailyBonusPct: cfg.dailyBonus,
+    });
   }, [cfg.craftCity, cfg.focus, cfg.dailyBonus, item]);
   const rrr = cfg.rrrMode === 'manual' ? clamp(cfg.rrr, 0, 100) : Math.round(bonus.rrrPct * 100) / 100;
 
@@ -308,26 +362,60 @@ export default function CalculatorView({
   const result = React.useMemo(() => {
     if (!item) return null;
     const resources = recipeResources.map(r => ({
-      id: r.id, es: r.es, q: r.q, ret: r.ret, max: r.max, price: getPrice(`mat:${r.id}`),
+      id: r.id,
+      es: r.es,
+      q: r.q,
+      ret: r.ret,
+      max: r.max,
+      price: getPrice(`mat:${r.id}`),
     }));
     const j = item.journal;
     return engine.calculate({
-      item, runs: Math.max(1, Number(cfg.runs) || 1),
+      item,
+      runs: Math.max(1, Number(cfg.runs) || 1),
       rrrPct: isEnchanting && baseMode === 'buy' ? 0 : rrr,
-      itemValue: isEnchanting ? (enchantBase?.value || 0) : item.value,
-      station: { mode: 'nutrition', feePer100: isEnchanting && baseMode === 'buy' ? 0 : Number(cfg.stationFee) || 0 },
-      resources, buyMode: cfg.buyMode, buyOrderFee: cfg.buyOrderFee,
-      sellMode: cfg.sellMode, sellPrice: getPrice(`sell:${item.id}`),
-      journal: cfg.journal && j ? { enabled: true, fame: j.fame, max: j.max,
-        emptyPrice: getPrice(`jrn:${j.empty}`), fullPrice: getPrice(`jrn:${j.full}`) } : null,
+      itemValue: isEnchanting ? enchantBase?.value || 0 : item.value,
+      station: {
+        mode: 'nutrition',
+        feePer100: isEnchanting && baseMode === 'buy' ? 0 : Number(cfg.stationFee) || 0,
+      },
+      resources,
+      buyMode: cfg.buyMode,
+      buyOrderFee: cfg.buyOrderFee,
+      sellMode: cfg.sellMode,
+      sellPrice: getPrice(`sell:${item.id}`),
+      journal:
+        cfg.journal && j
+          ? {
+              enabled: true,
+              fame: j.fame,
+              max: j.max,
+              emptyPrice: getPrice(`jrn:${j.empty}`),
+              fullPrice: getPrice(`jrn:${j.full}`),
+            }
+          : null,
       premium: shared.premium,
     });
-  }, [item, recipeResources, cfg, prices, manualPrices, rrr, shared.premium, isEnchanting, baseMode, enchantBase]); // eslint-disable-line react-hooks/exhaustive-deps
-  const requiredPriceKeys = item ? [
-    `sell:${item.id}`,
-    ...recipeResources.map(resource => `mat:${resource.id}`),
-    ...(cfg.journal && item.journal ? [`jrn:${item.journal.empty}`, `jrn:${item.journal.full}`] : []),
-  ] : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    item,
+    recipeResources,
+    cfg,
+    prices,
+    manualPrices,
+    rrr,
+    shared.premium,
+    isEnchanting,
+    baseMode,
+    enchantBase,
+  ]);
+  const requiredPriceKeys = item
+    ? [
+        `sell:${item.id}`,
+        ...recipeResources.map(resource => `mat:${resource.id}`),
+        ...(cfg.journal && item.journal ? [`jrn:${item.journal.empty}`, `jrn:${item.journal.full}`] : []),
+      ]
+    : [];
   const missingPriceCount = requiredPriceKeys.filter(key => !(getPrice(key) > 0)).length;
   const pricesComplete = !!item && missingPriceCount === 0;
 
@@ -338,60 +426,99 @@ export default function CalculatorView({
   function targets() {
     if (!item) return [];
     const list = recipeResources.map(r => ({
-      key: `mat:${r.id}`, id: r.id, city: rowCities[r.id] ?? cfg.buyCity,
+      key: `mat:${r.id}`,
+      id: r.id,
+      city: rowCities[r.id] ?? cfg.buyCity,
       mode: cfg.buyMode === 'instant' ? 'sell' : 'buy',
     }));
-    list.push({ key: `sell:${item.id}`, id: item.id, city: cfg.sellCity,
-      mode: cfg.sellMode === 'instant' ? 'buy' : 'sell' });
+    list.push({
+      key: `sell:${item.id}`,
+      id: item.id,
+      city: cfg.sellCity,
+      mode: cfg.sellMode === 'instant' ? 'buy' : 'sell',
+    });
     const j = item.journal;
     if (cfg.journal && j) {
       list.push({ key: `jrn:${j.empty}`, id: j.empty, city: cfg.buyCity, mode: 'sell' });
-      list.push({ key: `jrn:${j.full}`, id: j.full, city: cfg.sellCity,
-        mode: cfg.sellMode === 'instant' ? 'buy' : 'sell' });
+      list.push({
+        key: `jrn:${j.full}`,
+        id: j.full,
+        city: cfg.sellCity,
+        mode: cfg.sellMode === 'instant' ? 'buy' : 'sell',
+      });
     }
     return list;
   }
 
-  const priceRequestSignature = item ? JSON.stringify({
-    server: shared.server, quality: shared.quality,
-    sellCityPrices: showSellCityPrices ? CITIES.map(city => city.value) : [],
-    targets: targets().map(({ key, id, city, mode }) => [key, id, city, mode]),
-  }) : '';
+  const priceRequestSignature = item
+    ? JSON.stringify({
+        server: shared.server,
+        quality: shared.quality,
+        sellCityPrices: showSellCityPrices ? CITIES.map(city => city.value) : [],
+        targets: targets().map(({ key, id, city, mode }) => [key, id, city, mode]),
+      })
+    : '';
 
   async function loadPrices() {
     const list = targets();
-    if (!list.length) { setStatus('Elegí primero un ítem.'); return; }
-    const cities = [...new Set([
-      ...list.flatMap(target => target.city === 'Global' ? CITIES.map(city => city.value) : [target.city]),
-      ...(showSellCityPrices ? CITIES.map(city => city.value) : []),
-    ])];
+    if (!list.length) {
+      setStatus('Elegí primero un ítem.');
+      return;
+    }
+    const cities = [
+      ...new Set([
+        ...list.flatMap(target =>
+          target.city === 'Global' ? CITIES.map(city => city.value) : [target.city],
+        ),
+        ...(showSellCityPrices ? CITIES.map(city => city.value) : []),
+      ]),
+    ];
     const currentRequest = ++priceLoadId.current;
+    priceAbort.current?.abort();
+    const controller = new AbortController();
+    priceAbort.current = controller;
     autoPriceRequest.current = priceRequestSignature;
     setBusy(true);
-    setSaleQuotes(null);
+    /* Al recargar el mismo ítem se conserva la comparación anterior hasta que
+       llegue la nueva (evita que la tabla parpadee); si cambia el ítem, se limpia. */
+    setSaleQuotes(current => (current && current.itemId === item?.id ? current : null));
     setStatus('Consultando precios…');
     try {
       const rows = await api.fetchPrices({
-        server: shared.server, quality: shared.quality,
-        ids: list.map(t => t.id), cities,
+        server: shared.server,
+        quality: shared.quality,
+        ids: list.map(t => t.id),
+        cities,
+        signal: controller.signal,
       });
       if (currentRequest !== priceLoadId.current) return;
       const map = api.indexRows(rows);
       const resolved = list.map(target => ({
         ...target,
-        quote: target.city === 'Global'
-          ? lowestRecordedPrice(map, target.id, CITIES.map(city => city.value), shared.quality, target.mode)
-          : api.priceFor(api.pick(map, target.id, target.city, shared.quality), target.mode),
+        quote:
+          target.city === 'Global'
+            ? lowestRecordedPrice(
+                map,
+                target.id,
+                CITIES.map(city => city.value),
+                shared.quality,
+                target.mode,
+              )
+            : api.priceFor(api.pick(map, target.id, target.city, shared.quality), target.mode),
       }));
       setPrices(current => {
         const next = { ...current };
         resolved.forEach(({ key, quote }) => {
           next[key] = quote
             ? {
-              value: quote.price, date: quote.date, city: quote.city, manual: false,
-              source: quote.source, missing: false,
-              context: manualKey(targets().find(target => target.key === key)),
-            }
+                value: quote.price,
+                date: quote.date,
+                city: quote.city,
+                manual: false,
+                source: quote.source,
+                missing: false,
+                context: manualKey(targets().find(target => target.key === key)),
+              }
             : { value: '', date: null, city: null, manual: false, missing: true };
         });
         return next;
@@ -409,27 +536,48 @@ export default function CalculatorView({
         bestCityLabel = quotes[0]?.label || '';
         const selectedQuote = quotes.find(quote => quote.city === cfg.sellCity);
         const selectedTarget = {
-          key: `sell:${item.id}`, id: item.id, city: cfg.sellCity, mode: saleMode,
+          key: `sell:${item.id}`,
+          id: item.id,
+          city: cfg.sellCity,
+          mode: saleMode,
         };
         setPrices(current => ({
           ...current,
           [`sell:${item.id}`]: selectedQuote
             ? {
-              value: selectedQuote.price, date: selectedQuote.date, city: selectedQuote.city,
-              manual: false, source: selectedQuote.source, missing: false, context: manualKey(selectedTarget),
-            }
+                value: selectedQuote.price,
+                date: selectedQuote.date,
+                city: selectedQuote.city,
+                manual: false,
+                source: selectedQuote.source,
+                missing: false,
+                context: manualKey(selectedTarget),
+              }
             : { value: '', date: null, city: null, manual: false, missing: true },
         }));
       }
       const missingCount = resolved.filter(target => !target.quote).length;
       const hasGlobalTarget = list.some(target => target.city === 'Global');
-      setStatus(`✔ Precios actualizados · ${rows.length} registros recibidos.${missingCount ? ` ${missingCount} precios sin registrar; cargalos manualmente.` : ''}${hasGlobalTarget ? ' Menor precio registrado por ciudad, sin promediar.' : ''}${bestCityLabel ? ` Mejor precio de venta: ${bestCityLabel}.` : ''}${api.cacheNotice(rows) ? ` ${api.cacheNotice(rows)}` : ''}`);
+      setStatus(
+        `✔ Precios actualizados · ${rows.length} registros recibidos.${missingCount ? ` ${missingCount} precios sin registrar; cargalos manualmente.` : ''}${hasGlobalTarget ? ' Menor precio registrado por ciudad, sin promediar.' : ''}${bestCityLabel ? ` Mejor precio de venta: ${bestCityLabel}.` : ''}${api.cacheNotice(rows) ? ` ${api.cacheNotice(rows)}` : ''}`,
+      );
     } catch (error) {
-      if (currentRequest === priceLoadId.current) setStatus('✖ ' + error.message);
+      /* Una consulta cancelada por un cambio de configuración no es un error. */
+      if (currentRequest !== priceLoadId.current || api.isAbortError(error)) return;
+      setStatus('✖ ' + error.message);
     } finally {
       if (currentRequest === priceLoadId.current) setBusy(false);
     }
   }
+
+  /* Al desmontar la vista se cancela la consulta en curso. */
+  React.useEffect(
+    () => () => {
+      priceAbort.current?.abort();
+      compareAbort.current?.abort();
+    },
+    [],
+  );
 
   React.useEffect(() => {
     if (!priceRequestSignature || autoPriceRequest.current === priceRequestSignature) return undefined;
@@ -439,30 +587,43 @@ export default function CalculatorView({
       void loadPrices();
     }, 250);
     return () => clearTimeout(timer);
-  }, [priceRequestSignature]);
+  }, [priceRequestSignature]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function compareCities() {
-    if (!item) { setStatus('Elegí un ítem primero.'); return; }
+    if (!item) {
+      setStatus('Elegí un ítem primero.');
+      return;
+    }
+    compareAbort.current?.abort();
+    compareAbort.current = new AbortController();
     const ids = [item.id, ...recipeResources.map(r => r.id)];
     const cities = CITIES.map(c => c.value);
     setCompareBusy(true);
     setStatus('Comparando ciudades…');
     try {
-      const rows = await api.fetchPrices({ server: shared.server, quality: shared.quality, ids, cities,
+      const rows = await api.fetchPrices({
+        server: shared.server,
+        quality: shared.quality,
+        ids,
+        cities,
+        signal: compareAbort.current?.signal,
       });
       const map = api.indexRows(rows);
       const buyPriceMode = cfg.buyMode === 'instant' ? 'sell' : 'buy';
       const list = [];
       cities.forEach(city => {
-        const sale = api.priceFor(api.pick(map, item.id, city, shared.quality),
-          cfg.sellMode === 'instant' ? 'buy' : 'sell');
+        const sale = api.priceFor(
+          api.pick(map, item.id, city, shared.quality),
+          cfg.sellMode === 'instant' ? 'buy' : 'sell',
+        );
         if (!sale) return;
         let ok = true;
         const resources = recipeResources.map(r => {
           const materialCity = rowCities[r.id] ?? cfg.buyCity;
-          let quote = materialCity === 'Global'
-            ? lowestRecordedPrice(map, r.id, cities, shared.quality, buyPriceMode)
-            : api.priceFor(api.pick(map, r.id, materialCity, shared.quality), buyPriceMode);
+          let quote =
+            materialCity === 'Global'
+              ? lowestRecordedPrice(map, r.id, cities, shared.quality, buyPriceMode)
+              : api.priceFor(api.pick(map, r.id, materialCity, shared.quality), buyPriceMode);
           if (!quote && materialCity !== 'Global') {
             quote = api.bestPrice(map, r.id, cities.slice(0, 7), shared.quality, buyPriceMode);
           }
@@ -471,258 +632,469 @@ export default function CalculatorView({
         });
         if (!ok) return;
         const r = engine.calculate({
-          item, runs: Number(cfg.runs) || 1,
+          item,
+          runs: Number(cfg.runs) || 1,
           rrrPct: isEnchanting && baseMode === 'buy' ? 0 : rrr,
-          itemValue: isEnchanting ? (enchantBase?.value || 0) : item.value,
-          station: { mode: 'nutrition', feePer100: isEnchanting && baseMode === 'buy' ? 0 : Number(cfg.stationFee) || 0 },
-          resources, buyMode: cfg.buyMode, buyOrderFee: cfg.buyOrderFee,
-          sellMode: cfg.sellMode, sellPrice: sale.price, journal: null, premium: shared.premium,
+          itemValue: isEnchanting ? enchantBase?.value || 0 : item.value,
+          station: {
+            mode: 'nutrition',
+            feePer100: isEnchanting && baseMode === 'buy' ? 0 : Number(cfg.stationFee) || 0,
+          },
+          resources,
+          buyMode: cfg.buyMode,
+          buyOrderFee: cfg.buyOrderFee,
+          sellMode: cfg.sellMode,
+          sellPrice: sale.price,
+          journal: null,
+          premium: shared.premium,
         });
-        list.push({ city, price: sale.price, profit: r.profit / r.outputQty, roi: r.roi,
-          age: ageFromDate(sale.date).label });
+        list.push({
+          city,
+          price: sale.price,
+          profit: r.profit / r.outputQty,
+          roi: r.roi,
+          age: ageFromDate(sale.date).label,
+        });
       });
       list.sort((a, b) => b.profit - a.profit);
       setCompare(list);
       setStatus(list.length ? '✔ Comparación lista.' : '✖ Sin precios suficientes.');
     } catch (error) {
-      setStatus('✖ ' + error.message);
-    } finally { setCompareBusy(false); }
+      if (!api.isAbortError(error)) setStatus('✖ ' + error.message);
+    } finally {
+      setCompareBusy(false);
+    }
   }
 
   /* ---- Tablas ---- */
   const resourceById = id => result?.resources.find(r => r.id === id);
   const materialColumns = [
-    { label: 'Material', render: r => (
-      <div className="material-cell">
-        <img src={catalog.icon(r.id, shared.quality)} alt="" />
-        <div><strong>{r.es}</strong><small>{r.id}</small>
-          {r.kind === 'base' && <span className="badge-no-return">ítem base comprado</span>}
-          {r.kind === 'enchantment' && (
-            <>
-              <span className="badge-no-return">{r.stepLabel}</span>
-              <span className="badge-no-return">runa, alma o reliquia</span>
-            </>
-          )}
-          {r.ret === false && <span className="badge-no-return">no retorna</span>}
+    {
+      label: 'Material',
+      render: r => (
+        <div className="material-cell">
+          <img src={catalog.icon(r.id, shared.quality)} alt="" />
+          <div>
+            <strong>{r.es}</strong>
+            <small>{r.id}</small>
+            {r.kind === 'base' && <span className="badge-no-return">ítem base comprado</span>}
+            {r.kind === 'enchantment' && (
+              <>
+                <span className="badge-no-return">{r.stepLabel}</span>
+                <span className="badge-no-return">runa, alma o reliquia</span>
+              </>
+            )}
+            {r.ret === false && <span className="badge-no-return">no retorna</span>}
+          </div>
         </div>
-      </div>
-    ) },
+      ),
+    },
     { label: isEnchanting ? 'Por encantamiento' : 'Por crafteo', align: 'right', render: r => fmt(r.q) },
     { label: 'Bruto', align: 'right', render: r => fmt(resourceById(r.id)?.grossQty || 0) },
     { label: 'Devuelto', align: 'right', render: r => '−' + fmt(resourceById(r.id)?.expected || 0) },
     { label: 'Neto', align: 'right', render: r => fmt(resourceById(r.id)?.netQty || 0) },
-    { label: 'Ciudad', render: r => (
-      <select className="row-city" value={rowCities[r.id] ?? cfg.buyCity}
-        onChange={e => setRowCities(current => ({ ...current, [r.id]: e.target.value }))}>
-        <option value="Global">Menor precio registrado (todas las ciudades)</option>
-        {CITY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-      </select>
-    ) },
-    { label: 'Precio', align: 'right', render: r => {
-      const key = `mat:${r.id}`;
-      return (
-        <div className="price-cell">
-          <input className={cn('row-price', priceRecord(key)?.manual && 'manual')} type="number" min="0"
-            aria-label={`Precio de ${r.es}`} value={priceRecord(key)?.value ?? ''}
-            placeholder={priceRecord(key)?.missing ? '—' : 'Manual'}
-            onChange={e => setPrice(key, e.target.value)} />
-          <Age value={priceRecord(key)?.date} manual={priceRecord(key)?.manual}
-            source={priceRecord(key)?.source} missing={priceRecord(key)?.missing}
-            city={priceRecord(key)?.city} />
-          {priceRecord(key)?.manual && <button type="button" className="btn ghost"
-            onClick={() => clearManualPrice(key)}>Usar precio AODP</button>}
-        </div>
-      );
-    } },
-    { label: 'Coste neto', align: 'right', render: r => getPrice(`mat:${r.id}`) > 0
-      ? fmt(resourceById(r.id)?.netCost || 0)
-      : priceRecord(`mat:${r.id}`)?.missing ? 'No se registra precio' : '—' },
+    {
+      label: 'Ciudad',
+      render: r => (
+        <select
+          className="row-city"
+          value={rowCities[r.id] ?? cfg.buyCity}
+          onChange={e => setRowCities(current => ({ ...current, [r.id]: e.target.value }))}
+        >
+          <option value="Global">Menor precio registrado (todas las ciudades)</option>
+          {CITY_OPTIONS.map(c => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      label: 'Precio',
+      align: 'right',
+      render: r => {
+        const key = `mat:${r.id}`;
+        return (
+          <div className="price-cell">
+            <input
+              className={cn('row-price', priceRecord(key)?.manual && 'manual')}
+              type="number"
+              min="0"
+              aria-label={`Precio de ${r.es}`}
+              value={priceRecord(key)?.value ?? ''}
+              placeholder={priceRecord(key)?.missing ? '—' : 'Manual'}
+              onChange={e => setPrice(key, e.target.value)}
+            />
+            <Age
+              value={priceRecord(key)?.date}
+              manual={priceRecord(key)?.manual}
+              source={priceRecord(key)?.source}
+              missing={priceRecord(key)?.missing}
+              city={priceRecord(key)?.city}
+            />
+            {priceRecord(key)?.manual && (
+              <button type="button" className="btn ghost" onClick={() => clearManualPrice(key)}>
+                Usar precio AODP
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      label: 'Coste neto',
+      align: 'right',
+      render: r =>
+        getPrice(`mat:${r.id}`) > 0
+          ? fmt(resourceById(r.id)?.netCost || 0)
+          : priceRecord(`mat:${r.id}`)?.missing
+            ? 'No se registra precio'
+            : '—',
+    },
   ];
 
   const saleCityColumns = [
-    { label: 'Ciudad', render: quote => (
-      <div className="sale-city-choice">
-        <strong>{quote.label}</strong>
-        {quote.price && quote.price === saleQuotes?.quotes.find(entry => entry.price)?.price
-          && <span className="pill positive">Mejor precio</span>}
-      </div>
-    ) },
-    { label: 'Precio de venta', align: 'right', render: quote => quote.price
-      ? fmt(quote.price)
-      : <span className="hint">No se registra precio</span> },
-    { label: 'Actualizado', render: quote => quote.price
-      ? <Age value={quote.date} />
-      : <span className="age none">No se registra precio</span> },
-    { label: '', align: 'right', render: quote => (
-      <button type="button" className="btn tiny" disabled={!quote.price} onClick={() => {
-        setField('sellCity', quote.city);
-        const target = {
-          key: `sell:${item.id}`, id: item.id, city: quote.city,
-          mode: cfg.sellMode === 'instant' ? 'buy' : 'sell',
-        };
-        setPrices(current => ({
-          ...current,
-          [`sell:${item.id}`]: {
-            value: quote.price, date: quote.date, city: quote.city, manual: false,
-            source: quote.source, missing: false, context: manualKey(target),
-          },
-        }));
-      }}>Elegir ciudad</button>
-    ) },
+    {
+      label: 'Ciudad',
+      render: quote => (
+        <div className="sale-city-choice">
+          <strong>{quote.label}</strong>
+          {quote.price && quote.price === saleQuotes?.quotes.find(entry => entry.price)?.price && (
+            <span className="pill positive">Mejor precio</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      label: 'Precio de venta',
+      align: 'right',
+      render: quote => (quote.price ? fmt(quote.price) : <span className="hint">No se registra precio</span>),
+    },
+    {
+      label: 'Actualizado',
+      render: quote =>
+        quote.price ? <Age value={quote.date} /> : <span className="age none">No se registra precio</span>,
+    },
+    {
+      label: '',
+      align: 'right',
+      render: quote => (
+        <button
+          type="button"
+          className="btn tiny"
+          disabled={!quote.price}
+          onClick={() => {
+            setField('sellCity', quote.city);
+            const target = {
+              key: `sell:${item.id}`,
+              id: item.id,
+              city: quote.city,
+              mode: cfg.sellMode === 'instant' ? 'buy' : 'sell',
+            };
+            setPrices(current => ({
+              ...current,
+              [`sell:${item.id}`]: {
+                value: quote.price,
+                date: quote.date,
+                city: quote.city,
+                manual: false,
+                source: quote.source,
+                missing: false,
+                context: manualKey(target),
+              },
+            }));
+          }}
+        >
+          Elegir ciudad
+        </button>
+      ),
+    },
   ];
 
-  const breakdown = result && pricesComplete ? [
-    ['Unidades producidas', fmt(result.outputQty), ''],
-    ['Ingreso bruto', fmt(result.grossRevenue), ''],
-    ['Impuesto de venta', '−' + fmt(result.salesTax), 'negative'],
-    ['Tarifa de orden de venta', '−' + fmt(result.setupFee), 'negative'],
-    ['Ingreso por diarios llenos', '+' + fmt(result.journalRevenue), 'positive'],
-    ['Materiales brutos', fmt(result.grossMaterials), ''],
-    ['Devolución por RRR', '+' + fmt(result.returnedValue), 'positive'],
-    ['Materiales netos', fmt(result.netMaterials), ''],
-    ['Tarifa de orden de compra', '−' + fmt(result.buyOrderFee), 'negative'],
-    ['Tasa de estación', '−' + fmt(result.stationFee), 'negative'],
-    ['Diarios vacíos', '−' + fmt(result.journalCost), 'negative'],
-    ['Coste total', fmt(result.totalCosts), 'total'],
-  ] : [];
+  const breakdown =
+    result && pricesComplete
+      ? [
+          ['Unidades producidas', fmt(result.outputQty), ''],
+          ['Ingreso bruto', fmt(result.grossRevenue), ''],
+          ['Impuesto de venta', '−' + fmt(result.salesTax), 'negative'],
+          ['Tarifa de orden de venta', '−' + fmt(result.setupFee), 'negative'],
+          ['Ingreso por diarios llenos', '+' + fmt(result.journalRevenue), 'positive'],
+          ['Materiales brutos', fmt(result.grossMaterials), ''],
+          ['Devolución por RRR', '+' + fmt(result.returnedValue), 'positive'],
+          ['Materiales netos', fmt(result.netMaterials), ''],
+          ['Tarifa de orden de compra', '−' + fmt(result.buyOrderFee), 'negative'],
+          ['Tasa de estación', '−' + fmt(result.stationFee), 'negative'],
+          ['Diarios vacíos', '−' + fmt(result.journalCost), 'negative'],
+          ['Coste total', fmt(result.totalCosts), 'total'],
+        ]
+      : [];
 
-  const verdict = !result ? '—' : !pricesComplete ? 'Precios incompletos'
-    : result.profit > 0 ? 'Rentable' : result.profit < 0 ? 'Pérdida' : 'Punto muerto';
-  const verdictTone = !result || !pricesComplete ? '' : result.profit > 0 ? 'good' : result.profit < 0 ? 'bad' : 'even';
+  const verdict = !result
+    ? '—'
+    : !pricesComplete
+      ? 'Precios incompletos'
+      : result.profit > 0
+        ? 'Rentable'
+        : result.profit < 0
+          ? 'Pérdida'
+          : 'Punto muerto';
+  const verdictTone =
+    !result || !pricesComplete ? '' : result.profit > 0 ? 'good' : result.profit < 0 ? 'bad' : 'even';
   const craftingEnabled = !isEnchanting || baseMode === 'craft';
 
   return (
     <div className="module-view" data-module={moduleId}>
-      {showModuleHead && <div className="module-head">
-        <div>
-          <h1>{Icon ? <Icon className="size-5" /> : <span className="head-emoji">{meta?.icon}</span>}{meta?.label}</h1>
-          <p>{meta?.description}</p>
+      {showModuleHead && (
+        <div className="module-head">
+          <div>
+            <h1>
+              {Icon ? <Icon className="size-5" /> : <span className="head-emoji">{meta?.icon}</span>}
+              {meta?.label}
+            </h1>
+            <p>{meta?.description}</p>
+          </div>
+          <span className="module-badge">{meta?.group}</span>
         </div>
-        <span className="module-badge">{meta?.group}</span>
-      </div>}
+      )}
       <Tabs id="calc-tabs" tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === 'calc' ? (
         <div className="work-grid">
           <div className="config-col">
             <section className="card">
-              <div className="card-head"><h2>1 · Ítem</h2><span className="card-tag">{scopeLabel}</span></div>
+              <div className="card-head">
+                <h2>1 · Ítem</h2>
+                <span className="card-tag">{scopeLabel}</span>
+              </div>
               {isRefining ? (
                 <>
-                  <Select id="calc-refining-type" label="Tipo de recurso"
+                  <Select
+                    id="calc-refining-type"
+                    label="Tipo de recurso"
                     options={[{ value: '', label: 'Elegí un recurso…' }, ...REFINING_TYPES]}
                     value={refiningType}
                     onChange={value => {
                       setRefiningType(value);
                       setRefiningTier('');
                       setRefiningLevel('');
-                    }} />
-                  <Select id="calc-refining-tier" label="Nivel"
+                    }}
+                  />
+                  <Select
+                    id="calc-refining-tier"
+                    label="Nivel"
                     options={[{ value: '', label: 'Elegí un nivel…' }, ...refiningTierOptions]}
-                    value={refiningTier} disabled={!refiningType}
+                    value={refiningTier}
+                    disabled={!refiningType}
                     onChange={value => {
                       setRefiningTier(value);
                       setRefiningLevel('');
-                    }} />
-                  <Select id="calc-refining-enchantment" label="Encantamiento"
+                    }}
+                  />
+                  <Select
+                    id="calc-refining-enchantment"
+                    label="Encantamiento"
                     options={[{ value: '', label: 'Elegí un encantamiento…' }, ...refiningEnchantmentOptions]}
-                    value={refiningLevel} disabled={!refiningTier}
-                    onChange={setRefiningLevel} />
+                    value={refiningLevel}
+                    disabled={!refiningTier}
+                    onChange={setRefiningLevel}
+                  />
                   <div className={cn('item-card', !item && 'empty')} id="calc-refining-selection">
                     {item ? (
                       <>
                         <img src={catalog.icon(item.id, shared.quality)} alt="" />
                         <div className="item-card-text">
-                          <strong>{item.es}</strong><small>{item.id}</small>
+                          <strong>{item.es}</strong>
+                          <small>{item.id}</small>
                           <div className="tags">
                             <span className="pill">T{item.tier}</span>
                             <span className="pill gold">.{item.lvl}</span>
                           </div>
                         </div>
                       </>
-                    ) : <span>Elegí tipo, nivel y encantamiento</span>}
+                    ) : (
+                      <span>Elegí tipo, nivel y encantamiento</span>
+                    )}
                   </div>
                 </>
               ) : isEnchanting ? (
                 <>
-                  <ItemSelector id="calc-item" filter={catalog.isEnchantableBase} quality={shared.quality}
-                    value={enchantBase?.id || null} showCategory showVariants={false}
-                    placeholder="Buscar el ítem base por nombre o ID…" onChange={entry => applyEnchantBase(entry)} />
-                  <Select id="calc-enchantment-level" label="Encantamiento de destino"
+                  <ItemSelector
+                    id="calc-item"
+                    filter={catalog.isEnchantableBase}
+                    quality={shared.quality}
+                    value={enchantBase?.id || null}
+                    showCategory
+                    showVariants={false}
+                    placeholder="Buscar el ítem base por nombre o ID…"
+                    onChange={entry => applyEnchantBase(entry)}
+                  />
+                  <Select
+                    id="calc-enchantment-level"
+                    label="Encantamiento de destino"
                     options={enchantmentOptions.map(option => ({
                       value: String(option.lvl),
                       label: `.${option.lvl} · ${option.upgrade.es}`,
                     }))}
                     value={item ? String(item.lvl) : ''}
                     disabled={!enchantBase}
-                    onChange={selectEnchantment} />
+                    onChange={selectEnchantment}
+                  />
                 </>
               ) : (
-                <ItemSelector id="calc-item" filter={filter} quality={shared.quality} value={item?.id || null}
+                <ItemSelector
+                  id="calc-item"
+                  filter={filter}
+                  quality={shared.quality}
+                  value={item?.id || null}
                   showCategory={moduleId === 'crafting'}
-                  placeholder="Buscar por nombre o ID del ítem…" onChange={applyItem} />
+                  placeholder="Buscar por nombre o ID del ítem…"
+                  onChange={applyItem}
+                />
               )}
             </section>
 
             <section className="card">
-              <div className="card-head"><h2>2 · Producción</h2></div>
+              <div className="card-head">
+                <h2>2 · Producción</h2>
+              </div>
               {isEnchanting && (
-                <Select id="calc-base-mode" label="Cómo obtener el ítem base"
-                  options={[{ value: 'buy', label: 'Comprar el ítem base' },
-                    { value: 'craft', label: 'Craftear el ítem base' }]}
-                  value={baseMode} onChange={setBaseMode} />
+                <Select
+                  id="calc-base-mode"
+                  label="Cómo obtener el ítem base"
+                  options={[
+                    { value: 'buy', label: 'Comprar el ítem base' },
+                    { value: 'craft', label: 'Craftear el ítem base' },
+                  ]}
+                  value={baseMode}
+                  onChange={setBaseMode}
+                />
               )}
-              <NumberField id="calc-runs" label={isEnchanting ? 'Cantidad (lote)' : 'Crafteos (lotes)'}
-                value={cfg.runs} min={1}
-                onChange={v => setField('runs', v)} />
+              <NumberField
+                id="calc-runs"
+                label={isEnchanting ? 'Cantidad (lote)' : 'Crafteos (lotes)'}
+                value={cfg.runs}
+                min={1}
+                onChange={v => setField('runs', v)}
+              />
               {!isEnchanting && (
-                <Select id="calc-craft-city" label="Dónde craftear" options={CRAFT_CITIES}
-                value={cfg.craftCity} onChange={v => setField('craftCity', v)}
-                  hint="Define el bonus de producción y el RRR" />
+                <Select
+                  id="calc-craft-city"
+                  label="Dónde craftear"
+                  options={CRAFT_CITIES}
+                  value={cfg.craftCity}
+                  onChange={v => setField('craftCity', v)}
+                  hint="Define el bonus de producción y el RRR"
+                />
               )}
               {isEnchanting && craftingEnabled && (
-                <Select id="calc-craft-city" label="Dónde craftear el ítem base" options={CRAFT_CITIES}
-                  value={cfg.craftCity} onChange={v => setField('craftCity', v)}
-                  hint="Define el bonus de producción y el RRR del ítem base" />
+                <Select
+                  id="calc-craft-city"
+                  label="Dónde craftear el ítem base"
+                  options={CRAFT_CITIES}
+                  value={cfg.craftCity}
+                  onChange={v => setField('craftCity', v)}
+                  hint="Define el bonus de producción y el RRR del ítem base"
+                />
               )}
               {(!isEnchanting || craftingEnabled) && (
-                <Toggle id="calc-sync-buy" label="Comprar materiales en esa ciudad"
-                  checked={cfg.syncBuy} disabled={!craftingEnabled} onChange={v => setField('syncBuy', v)} />
+                <Toggle
+                  id="calc-sync-buy"
+                  label="Comprar materiales en esa ciudad"
+                  checked={cfg.syncBuy}
+                  disabled={!craftingEnabled}
+                  onChange={v => setField('syncBuy', v)}
+                />
               )}
               {(!isEnchanting || craftingEnabled) && (
-              <Select id="calc-rrr-mode" label="Return Rate"
-                options={[{ value: 'auto', label: 'Automático (ciudad + Focus)' }, { value: 'manual', label: 'Manual' }]}
-                value={cfg.rrrMode} disabled={!craftingEnabled} onChange={v => setField('rrrMode', v)} />
+                <Select
+                  id="calc-rrr-mode"
+                  label="Return Rate"
+                  options={[
+                    { value: 'auto', label: 'Automático (ciudad + Focus)' },
+                    { value: 'manual', label: 'Manual' },
+                  ]}
+                  value={cfg.rrrMode}
+                  disabled={!craftingEnabled}
+                  onChange={v => setField('rrrMode', v)}
+                />
               )}
               {(!isEnchanting || craftingEnabled) && cfg.rrrMode === 'manual' && (
-                <Select id="calc-rrr-preset" label="Preset"
-                  options={[{ value: '15.2', label: 'Sin bonus · 15,2 %' }, { value: '36.7', label: 'Ciudad · 36,7 %' },
-                    { value: '43.5', label: 'Focus · 43,5 %' }, { value: '53.9', label: 'Ciudad + Focus · 53,9 %' },
-                    { value: 'custom', label: 'Personalizado' }]}
-                  value={cfg.rrrPreset} disabled={!craftingEnabled} onChange={v => setField('rrrPreset', v)} />
+                <Select
+                  id="calc-rrr-preset"
+                  label="Preset"
+                  options={[
+                    { value: '15.2', label: 'Sin bonus · 15,2 %' },
+                    { value: '36.7', label: 'Ciudad · 36,7 %' },
+                    { value: '43.5', label: 'Focus · 43,5 %' },
+                    { value: '53.9', label: 'Ciudad + Focus · 53,9 %' },
+                    { value: 'custom', label: 'Personalizado' },
+                  ]}
+                  value={cfg.rrrPreset}
+                  disabled={!craftingEnabled}
+                  onChange={v => setField('rrrPreset', v)}
+                />
               )}
-              {(!isEnchanting || craftingEnabled) && <NumberField id="calc-rrr" label="RRR (%)" value={cfg.rrrMode === 'manual' ? cfg.rrr : rrr}
-                min={0} step={0.1} disabled={!craftingEnabled} readOnly={cfg.rrrMode !== 'manual'}
-                onChange={v => setField('rrr', v)} />
-              }
-              {(!isEnchanting || craftingEnabled) && <p className="hint" id="calc-rrr-info">
-                {cfg.rrrMode === 'manual'
-                  ? 'RRR manual: podés usar un preset o escribir el valor.'
-                  : `Bonus en ${cityLabel(cfg.craftCity === 'auto' ? (item ? bestCityFor(item.ccat, item.refine) : 'Thetford') : cfg.craftCity)}: ${bonus.total.toFixed(2)} → RRR ${fmt2(rrr)} % (base ${bonus.base.toFixed(2)} + categoría ${bonus.modifier.toFixed(2)} + Focus ${bonus.focus.toFixed(2)} + diario ${bonus.daily.toFixed(2)})`}
-              </p>}
-              {(!isEnchanting || craftingEnabled) && <Toggle id="calc-focus" label="Usar Focus (+59 % bonus)"
-                checked={cfg.focus} disabled={!craftingEnabled} onChange={v => setField('focus', v)} />}
-              {(!isEnchanting || craftingEnabled) && <NumberField id="calc-daily-bonus" label="Bonus diario (%)" value={cfg.dailyBonus}
-                disabled={!craftingEnabled}
-                onChange={v => setField('dailyBonus', v)} />
-              }
+              {(!isEnchanting || craftingEnabled) && (
+                <NumberField
+                  id="calc-rrr"
+                  label="RRR (%)"
+                  value={cfg.rrrMode === 'manual' ? cfg.rrr : rrr}
+                  min={0}
+                  step={0.1}
+                  disabled={!craftingEnabled}
+                  readOnly={cfg.rrrMode !== 'manual'}
+                  onChange={v => setField('rrr', v)}
+                />
+              )}
+              {(!isEnchanting || craftingEnabled) && (
+                <p className="hint" id="calc-rrr-info">
+                  {cfg.rrrMode === 'manual'
+                    ? 'RRR manual: podés usar un preset o escribir el valor.'
+                    : `Bonus en ${cityLabel(cfg.craftCity === 'auto' ? (item ? bestCityFor(item.ccat, item.refine) : 'Thetford') : cfg.craftCity)}: ${bonus.total.toFixed(2)} → RRR ${fmt2(rrr)} % (base ${bonus.base.toFixed(2)} + categoría ${bonus.modifier.toFixed(2)} + Focus ${bonus.focus.toFixed(2)} + diario ${bonus.daily.toFixed(2)})`}
+                </p>
+              )}
+              {(!isEnchanting || craftingEnabled) && (
+                <Toggle
+                  id="calc-focus"
+                  label="Usar Focus (+59 % bonus)"
+                  checked={cfg.focus}
+                  disabled={!craftingEnabled}
+                  onChange={v => setField('focus', v)}
+                />
+              )}
+              {(!isEnchanting || craftingEnabled) && (
+                <NumberField
+                  id="calc-daily-bonus"
+                  label="Bonus diario (%)"
+                  value={cfg.dailyBonus}
+                  disabled={!craftingEnabled}
+                  onChange={v => setField('dailyBonus', v)}
+                />
+              )}
               {(!isEnchanting || craftingEnabled) && <hr />}
-              {(!isEnchanting || craftingEnabled) && <NumberField id="calc-station-fee" label="Tasa de estación (plata / 100 nutrición)"
-                value={cfg.stationFee} onChange={v => setField('stationFee', v)}
-                disabled={!craftingEnabled} hint="Valor que fija el dueño de la estación; se introduce a mano" />}
-              {(!isEnchanting || craftingEnabled) && <p className="hint" id="calc-station-info">
-                Nutrición por crafteo: {fmt2(result?.nutritionPerRun || 0)} · total: {fmt2(result?.nutritionTotal || 0)} · coste: {fmt(result?.stationFee || 0)} p
-              </p>}
+              {(!isEnchanting || craftingEnabled) && (
+                <NumberField
+                  id="calc-station-fee"
+                  label="Tasa de estación (plata / 100 nutrición)"
+                  value={cfg.stationFee}
+                  onChange={v => setField('stationFee', v)}
+                  disabled={!craftingEnabled}
+                  hint="Valor que fija el dueño de la estación; se introduce a mano"
+                />
+              )}
+              {(!isEnchanting || craftingEnabled) && (
+                <p className="hint" id="calc-station-info">
+                  Nutrición por crafteo: {fmt2(result?.nutritionPerRun || 0)} · total:{' '}
+                  {fmt2(result?.nutritionTotal || 0)} · coste: {fmt(result?.stationFee || 0)} p
+                </p>
+              )}
+              {(!isEnchanting || craftingEnabled) && item && !(item.value > 0) && (
+                <p className="hint warn" id="calc-station-value-warning">
+                  El catálogo no registra un <em>item value</em> para este ítem, así que la nutrición y la
+                  tasa de estación se calculan en 0. Verificá el coste real en el juego antes de decidir.
+                </p>
+              )}
               {isEnchanting && !craftingEnabled && (
                 <p className="hint" id="calc-crafting-disabled">
                   Los bonus de crafteo y la tasa de estación solo se aplican si crafteás el ítem base.
@@ -731,69 +1103,161 @@ export default function CalculatorView({
             </section>
 
             <section className="card">
-              <div className="card-head"><h2>3 · Mercado e impuestos</h2></div>
-              <Select id="calc-buy-city"
-                label={isEnchanting && baseMode === 'buy'
-                  ? 'Dónde comprar el ítem base y los materiales' : 'Dónde comprar los materiales'}
-                options={CITY_OPTIONS}
-                value={cfg.buyCity} onChange={v => setField('buyCity', v)} />
-              <Select id="calc-buy-mode" label="Modo de compra"
-                options={[{ value: 'instant', label: 'Compra inmediata (sell_price_min)' },
-                  { value: 'order', label: 'Orden de compra (buy_price_max)' }]}
-                value={cfg.buyMode} onChange={v => setField('buyMode', v)} />
-              <Toggle id="calc-buy-order-fee" label="Sumar tarifa de orden de compra (2,5 %)"
-                checked={cfg.buyOrderFee} onChange={v => setField('buyOrderFee', v)} />
-              <hr />
-              <Select id="calc-sell-city" label="Dónde vender" options={CITY_OPTIONS}
-                value={cfg.sellCity} onChange={v => setField('sellCity', v)} />
-              <Select id="calc-sell-mode" label="Modo de venta"
-                options={[{ value: 'order', label: 'Orden de venta (sell_price_min)' },
-                  { value: 'instant', label: 'Venta directa (buy_price_max)' }]}
-                value={cfg.sellMode} onChange={v => setField('sellMode', v)} />
-              <div className="tax-box" id="calc-tax-summary">
-                <div><span>Impuesto de transacción ({shared.premium ? 'Premium' : 'sin Premium'})</span><b>{taxRate} %</b></div>
-                <div><span>Tarifa de orden de venta</span><b>{cfg.sellMode === 'order' ? '2,5 %' : 'no aplica'}</b></div>
-                <div><span>Deducción total</span><b>{fmt2(taxRate + orderFee)} %</b></div>
-                <div><span>Tarifa de orden de compra</span><b>{cfg.buyMode === 'order' && cfg.buyOrderFee ? '2,5 %' : 'no aplica'}</b></div>
+              <div className="card-head">
+                <h2>3 · Mercado e impuestos</h2>
               </div>
-              <button type="button" className="btn primary full" id="calc-load-prices" disabled={busy}
-                onClick={() => loadPrices()}>↻ Cargar precios del mercado</button>
-              <p className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')} id="calc-status">{status}</p>
+              <Select
+                id="calc-buy-city"
+                label={
+                  isEnchanting && baseMode === 'buy'
+                    ? 'Dónde comprar el ítem base y los materiales'
+                    : 'Dónde comprar los materiales'
+                }
+                options={CITY_OPTIONS}
+                value={cfg.buyCity}
+                onChange={v => setField('buyCity', v)}
+              />
+              <Select
+                id="calc-buy-mode"
+                label="Modo de compra"
+                options={[
+                  { value: 'instant', label: 'Compra inmediata (sell_price_min)' },
+                  { value: 'order', label: 'Orden de compra (buy_price_max)' },
+                ]}
+                value={cfg.buyMode}
+                onChange={v => setField('buyMode', v)}
+              />
+              <Toggle
+                id="calc-buy-order-fee"
+                label="Sumar tarifa de orden de compra (2,5 %)"
+                checked={cfg.buyOrderFee}
+                onChange={v => setField('buyOrderFee', v)}
+              />
+              <hr />
+              <Select
+                id="calc-sell-city"
+                label="Dónde vender"
+                options={CITY_OPTIONS}
+                value={cfg.sellCity}
+                onChange={v => setField('sellCity', v)}
+              />
+              <Select
+                id="calc-sell-mode"
+                label="Modo de venta"
+                options={[
+                  { value: 'order', label: 'Orden de venta (sell_price_min)' },
+                  { value: 'instant', label: 'Venta directa (buy_price_max)' },
+                ]}
+                value={cfg.sellMode}
+                onChange={v => setField('sellMode', v)}
+              />
+              <div className="tax-box" id="calc-tax-summary">
+                <div>
+                  <span>Impuesto de transacción ({shared.premium ? 'Premium' : 'sin Premium'})</span>
+                  <b>{taxRate} %</b>
+                </div>
+                <div>
+                  <span>Tarifa de orden de venta</span>
+                  <b>{cfg.sellMode === 'order' ? '2,5 %' : 'no aplica'}</b>
+                </div>
+                <div>
+                  <span>Deducción total</span>
+                  <b>{fmt2(taxRate + orderFee)} %</b>
+                </div>
+                <div>
+                  <span>Tarifa de orden de compra</span>
+                  <b>{cfg.buyMode === 'order' && cfg.buyOrderFee ? '2,5 %' : 'no aplica'}</b>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn primary full"
+                id="calc-load-prices"
+                disabled={busy}
+                onClick={() => loadPrices()}
+              >
+                ↻ Cargar precios del mercado
+              </button>
+              <p
+                className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')}
+                id="calc-status"
+              >
+                {status}
+              </p>
             </section>
 
             <section className="card">
-              <div className="card-head"><h2>4 · Diarios</h2></div>
-              <Toggle id="calc-journal" label="Usar diarios de crafteo" checked={cfg.journal}
-                disabled={!item?.journal} onChange={v => setField('journal', v)} />
+              <div className="card-head">
+                <h2>4 · Diarios</h2>
+              </div>
+              <Toggle
+                id="calc-journal"
+                label="Usar diarios de crafteo"
+                checked={cfg.journal}
+                disabled={!item?.journal}
+                onChange={v => setField('journal', v)}
+              />
               {!item?.journal ? (
-                <p className="hint" id="calc-journal-none">Este ítem no genera diarios.</p>
+                <p className="hint" id="calc-journal-none">
+                  Este ítem no genera diarios.
+                </p>
               ) : cfg.journal ? (
                 <div id="calc-journal-block">
                   <p className="hint" id="calc-journal-name">
-                    {item.journal.type} · fama por crafteo {fmt(item.journal.fame)} · máxima {fmt(item.journal.max)}
+                    {item.journal.type} · fama por crafteo {fmt(item.journal.fame)} · máxima{' '}
+                    {fmt(item.journal.max)}
                   </p>
-                  <NumberField id="calc-journal-empty" label="Diario vacío · precio unitario"
+                  <NumberField
+                    id="calc-journal-empty"
+                    label="Diario vacío · precio unitario"
                     value={priceRecord(`jrn:${item.journal.empty}`)?.value ?? ''}
-                    placeholder={priceRecord(`jrn:${item.journal.empty}`)?.missing ? 'No se registra precio' : 'Manual'}
-                    onChange={v => setPrice(`jrn:${item.journal.empty}`, v)} />
-                  {priceRecord(`jrn:${item.journal.empty}`)?.manual && <button type="button" className="btn ghost"
-                    onClick={() => clearManualPrice(`jrn:${item.journal.empty}`)}>Usar precio AODP</button>}
-                  <NumberField id="calc-journal-full" label="Diario lleno · precio unitario"
+                    placeholder={
+                      priceRecord(`jrn:${item.journal.empty}`)?.missing ? 'No se registra precio' : 'Manual'
+                    }
+                    onChange={v => setPrice(`jrn:${item.journal.empty}`, v)}
+                  />
+                  {priceRecord(`jrn:${item.journal.empty}`)?.manual && (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => clearManualPrice(`jrn:${item.journal.empty}`)}
+                    >
+                      Usar precio AODP
+                    </button>
+                  )}
+                  <NumberField
+                    id="calc-journal-full"
+                    label="Diario lleno · precio unitario"
                     value={priceRecord(`jrn:${item.journal.full}`)?.value ?? ''}
-                    placeholder={priceRecord(`jrn:${item.journal.full}`)?.missing ? 'No se registra precio' : 'Manual'}
-                    onChange={v => setPrice(`jrn:${item.journal.full}`, v)} />
-                  {priceRecord(`jrn:${item.journal.full}`)?.manual && <button type="button" className="btn ghost"
-                    onClick={() => clearManualPrice(`jrn:${item.journal.full}`)}>Usar precio AODP</button>}
-                  <Age value={priceRecord(`jrn:${item.journal.empty}`)?.date}
+                    placeholder={
+                      priceRecord(`jrn:${item.journal.full}`)?.missing ? 'No se registra precio' : 'Manual'
+                    }
+                    onChange={v => setPrice(`jrn:${item.journal.full}`, v)}
+                  />
+                  {priceRecord(`jrn:${item.journal.full}`)?.manual && (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => clearManualPrice(`jrn:${item.journal.full}`)}
+                    >
+                      Usar precio AODP
+                    </button>
+                  )}
+                  <Age
+                    value={priceRecord(`jrn:${item.journal.empty}`)?.date}
                     manual={priceRecord(`jrn:${item.journal.empty}`)?.manual}
                     source={priceRecord(`jrn:${item.journal.empty}`)?.source}
-                    missing={priceRecord(`jrn:${item.journal.empty}`)?.missing} />
-                  <Age value={priceRecord(`jrn:${item.journal.full}`)?.date}
+                    missing={priceRecord(`jrn:${item.journal.empty}`)?.missing}
+                  />
+                  <Age
+                    value={priceRecord(`jrn:${item.journal.full}`)?.date}
                     manual={priceRecord(`jrn:${item.journal.full}`)?.manual}
                     source={priceRecord(`jrn:${item.journal.full}`)?.source}
-                    missing={priceRecord(`jrn:${item.journal.full}`)?.missing} />
+                    missing={priceRecord(`jrn:${item.journal.full}`)?.missing}
+                  />
                   <p className="hint" id="calc-journal-fame">
-                    Vacíos: {result?.journal?.required ?? 0} · llenos: {result?.journal?.full ?? 0} · parcial: {fmt2(result?.journal?.partialPct ?? 0)} %
+                    Vacíos: {result?.journal?.required ?? 0} · llenos: {result?.journal?.full ?? 0} · parcial:{' '}
+                    {fmt2(result?.journal?.partialPct ?? 0)} %
                   </p>
                 </div>
               ) : null}
@@ -802,68 +1266,117 @@ export default function CalculatorView({
 
           <div className="results-col">
             <section className="card">
-              <div className="card-head"><h2>{isRefining
-                ? (useHeartRecipe ? 'Receta alternativa y precios' : 'Receta principal y precios')
-                : 'Receta y precios'}</h2>
+              <div className="card-head">
+                <h2>
+                  {isRefining
+                    ? useHeartRecipe
+                      ? 'Receta alternativa y precios'
+                      : 'Receta principal y precios'
+                    : 'Receta y precios'}
+                </h2>
                 <span className="card-tag" id="calc-recipe-meta">
                   {item ? `${item.id} · ${recipeResources.length} materiales` : 'Sin ítem'}
                 </span>
               </div>
               {isRefining && item?.alternateRes?.length > 0 && (
-                <Toggle id="calc-refining-heart-recipe" label="Usar receta alternativa con corazones"
-                  checked={useHeartRecipe} onChange={setUseHeartRecipe}
-                  hint="La receta principal siempre se conserva; esta opción cambia los materiales usados en el cálculo." />
+                <Toggle
+                  id="calc-refining-heart-recipe"
+                  label="Usar receta alternativa con corazones"
+                  checked={useHeartRecipe}
+                  onChange={setUseHeartRecipe}
+                  hint="La receta principal siempre se conserva; esta opción cambia los materiales usados en el cálculo."
+                />
               )}
               {isRefining && useHeartRecipe && item?.alternateRes?.length > 0 && (
                 <div className="primary-recipe-reference" id="calc-primary-recipe-ref">
                   <strong>Receta principal (siempre)</strong>
-                  <ul>{item.res.map(resource => (
-                    <li key={resource.id}>
-                      <span>{resource.es} <small>{resource.id}</small></span>
-                      <b>× {fmt(resource.q)}</b>
-                    </li>
-                  ))}</ul>
+                  <ul>
+                    {item.res.map(resource => (
+                      <li key={resource.id}>
+                        <span>
+                          {resource.es} <small>{resource.id}</small>
+                        </span>
+                        <b>× {fmt(resource.q)}</b>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <div id="calc-materials">
                 {item ? (
-                  <DataTable columns={materialColumns} rows={recipeResources} className="materials-table"
+                  <DataTable
+                    columns={materialColumns}
+                    rows={recipeResources}
+                    className="materials-table"
                     empty="Sin materiales"
-                    foot={<tr><td colSpan="7"><strong>Total de materiales (neto)</strong></td>
-                    <td className="num" id="calc-materials-total">{pricesComplete ? fmt(result?.netMaterials || 0)
-                      : 'Completá precios'}</td></tr>} />
-                ) : <p className="empty-note">Elegí un ítem para ver su receta.</p>}
+                    foot={
+                      <tr>
+                        <td colSpan="7">
+                          <strong>Total de materiales (neto)</strong>
+                        </td>
+                        <td className="num" id="calc-materials-total">
+                          {pricesComplete ? fmt(result?.netMaterials || 0) : 'Completá precios'}
+                        </td>
+                      </tr>
+                    }
+                  />
+                ) : (
+                  <p className="empty-note">Elegí un ítem para ver su receta.</p>
+                )}
               </div>
               <div className="sale-row">
                 <div>
                   <strong>Precio de venta unitario</strong>
                   <small className="hint" id="calc-sale-hint">
-                    Referencia: {cfg.sellMode === 'order' ? 'sell_price_min' : 'buy_price_max'} de {cfg.sellCity}.
+                    Referencia: {cfg.sellMode === 'order' ? 'sell_price_min' : 'buy_price_max'} de{' '}
+                    {cfg.sellCity}.
                   </small>
                 </div>
                 <div className="sale-controls">
-                  <input type="number" id="calc-sale-price" min="0" aria-label="Precio de venta"
+                  <input
+                    type="number"
+                    id="calc-sale-price"
+                    min="0"
+                    aria-label="Precio de venta"
                     className={cn(priceRecord(`sell:${item?.id}`)?.manual && 'manual')}
                     value={item ? (priceRecord(`sell:${item.id}`)?.value ?? '') : ''}
-                    placeholder={priceRecord(`sell:${item?.id}`)?.missing ? 'No se registra precio' : 'Manual'}
-                    onChange={e => item && setPrice(`sell:${item.id}`, e.target.value)} />
-                  {item && <Age value={priceRecord(`sell:${item.id}`)?.date}
-                    manual={priceRecord(`sell:${item.id}`)?.manual}
-                    source={priceRecord(`sell:${item.id}`)?.source}
-                    missing={priceRecord(`sell:${item.id}`)?.missing}
-                    city={priceRecord(`sell:${item.id}`)?.city} />}
+                    placeholder={
+                      priceRecord(`sell:${item?.id}`)?.missing ? 'No se registra precio' : 'Manual'
+                    }
+                    onChange={e => item && setPrice(`sell:${item.id}`, e.target.value)}
+                  />
+                  {item && (
+                    <Age
+                      value={priceRecord(`sell:${item.id}`)?.date}
+                      manual={priceRecord(`sell:${item.id}`)?.manual}
+                      source={priceRecord(`sell:${item.id}`)?.source}
+                      missing={priceRecord(`sell:${item.id}`)?.missing}
+                      city={priceRecord(`sell:${item.id}`)?.city}
+                    />
+                  )}
                   {item && priceRecord(`sell:${item.id}`)?.manual && (
-                    <button type="button" className="btn ghost" onClick={() => clearManualPrice(`sell:${item.id}`)}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => clearManualPrice(`sell:${item.id}`)}
+                    >
                       Usar precio AODP
                     </button>
                   )}
-                  <button type="button" className="btn ghost" id="calc-use-sell-price" disabled={!item || busy}
-                    onClick={() => item && loadPrices()}>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    id="calc-use-sell-price"
+                    disabled={!item || busy}
+                    onClick={() => item && loadPrices()}
+                  >
                     Actualizar precios
                   </button>
                 </div>
               </div>
-              {showSellCityPrices && item && saleQuotes?.itemId === item.id &&
+              {showSellCityPrices &&
+                item &&
+                saleQuotes?.itemId === item.id &&
                 saleQuotes.sellMode === cfg.sellMode && (
                   <section className="sale-city-prices" id="calc-sale-city-prices">
                     <div className="card-head">
@@ -873,57 +1386,124 @@ export default function CalculatorView({
                       </span>
                     </div>
                     <p className="hint">Mejores precios disponibles según los datos actuales de AODP.</p>
-                    <DataTable columns={saleCityColumns} rows={saleQuotes.quotes}
-                      className="sale-city-table" empty="No hay precios disponibles en las ciudades consultadas." />
+                    <DataTable
+                      columns={saleCityColumns}
+                      rows={saleQuotes.quotes}
+                      className="sale-city-table"
+                      empty="No hay precios disponibles en las ciudades consultadas."
+                    />
                   </section>
                 )}
             </section>
 
             <section className="card">
-              <div className="card-head"><h2>Resultado</h2>
-                <span className={cn('verdict', verdictTone)} id="calc-verdict">{verdict}</span>
+              <div className="card-head">
+                <h2>Resultado</h2>
+                <span className={cn('verdict', verdictTone)} id="calc-verdict">
+                  {verdict}
+                </span>
               </div>
               {item && !pricesComplete && (
                 <p className="hint" id="calc-missing-prices">
-                  Completá {missingPriceCount} precio{missingPriceCount === 1 ? '' : 's'} con datos del mercado o ingresalos manualmente para calcular resultados.
+                  Completá {missingPriceCount} precio{missingPriceCount === 1 ? '' : 's'} con datos del
+                  mercado o ingresalos manualmente para calcular resultados.
                 </p>
               )}
-              <ResultGrid cards={[
-                { id: 'calc-profit', label: 'Ganancia neta', value: pricesComplete ? fmt(result?.profit || 0) : '—',
-                  tone: cn('hero', (result?.profit || 0) < 0 && 'negative') },
-                { id: 'calc-roi', label: 'ROI', value: pricesComplete ? fmt2(result?.roi || 0) + ' %' : '—' },
-                { id: 'calc-unit', label: 'Ganancia por ítem', value: pricesComplete ? fmt(result?.profitPerItem || 0) : '—' },
-                { id: 'calc-breakeven', label: 'Precio de equilibrio',
-                  value: !pricesComplete || result?.breakEven == null ? '—' : fmt(result.breakEven) },
-              ]} />
+              <ResultGrid
+                cards={[
+                  {
+                    id: 'calc-profit',
+                    label: 'Ganancia neta',
+                    value: pricesComplete ? fmt(result?.profit || 0) : '—',
+                    tone: cn('hero', (result?.profit || 0) < 0 && 'negative'),
+                  },
+                  {
+                    id: 'calc-roi',
+                    label: 'ROI',
+                    value: pricesComplete ? fmt2(result?.roi || 0) + ' %' : '—',
+                  },
+                  {
+                    id: 'calc-unit',
+                    label: 'Ganancia por ítem',
+                    value: pricesComplete ? fmt(result?.profitPerItem || 0) : '—',
+                  },
+                  {
+                    id: 'calc-breakeven',
+                    label: 'Precio de equilibrio',
+                    value: !pricesComplete || result?.breakEven == null ? '—' : fmt(result.breakEven),
+                  },
+                ]}
+              />
               <div className="breakdown" id="calc-breakdown">
-                {result && <div className="breakdown-table">{breakdown.map(([label, value, tone]) => (
-                  <div className={cn('line', tone)} key={label}><span>{label}</span><b>{value}</b></div>
-                ))}</div>}
+                {result && (
+                  <div className="breakdown-table">
+                    {breakdown.map(([label, value, tone]) => (
+                      <div className={cn('line', tone)} key={label}>
+                        <span>{label}</span>
+                        <b>{value}</b>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 
             <section className="card">
-              <div className="card-head"><h2>Comparativa Premium</h2><span className="card-tag">Mismo escenario</span></div>
-              <div className="premium-grid">
-                <div className="premium-col"><span className="pill blue">Con Premium · 4 %</span>
-                  <strong id="calc-premium-profit">{pricesComplete ? fmt(result?.premiumComparison.withPremium || 0) : '—'}</strong><small>ganancia neta</small></div>
-                <div className="premium-col"><span className="pill">Sin Premium · 8 %</span>
-                  <strong id="calc-nopremium-profit">{pricesComplete ? fmt(result?.premiumComparison.withoutPremium || 0) : '—'}</strong><small>ganancia neta</small></div>
-                <div className="premium-col accent"><span className="pill gold">Diferencia</span>
-                  <strong id="calc-premium-delta">{pricesComplete ? fmt(result?.premiumComparison.delta || 0) : '—'}</strong>
-                  <small id="calc-premium-note">{pricesComplete ? `ahorro ${fmt(result?.premiumComparison.taxSaved || 0)} p` : 'Precios pendientes'}</small></div>
+              <div className="card-head">
+                <h2>Comparativa Premium</h2>
+                <span className="card-tag">Mismo escenario</span>
               </div>
-              <p className="hint">La tarifa de orden (2,5 %) es igual con y sin Premium: cambia solo el impuesto de transacción.</p>
+              <div className="premium-grid">
+                <div className="premium-col">
+                  <span className="pill blue">Con Premium · 4 %</span>
+                  <strong id="calc-premium-profit">
+                    {pricesComplete ? fmt(result?.premiumComparison.withPremium || 0) : '—'}
+                  </strong>
+                  <small>ganancia neta</small>
+                </div>
+                <div className="premium-col">
+                  <span className="pill">Sin Premium · 8 %</span>
+                  <strong id="calc-nopremium-profit">
+                    {pricesComplete ? fmt(result?.premiumComparison.withoutPremium || 0) : '—'}
+                  </strong>
+                  <small>ganancia neta</small>
+                </div>
+                <div className="premium-col accent">
+                  <span className="pill gold">Diferencia</span>
+                  <strong id="calc-premium-delta">
+                    {pricesComplete ? fmt(result?.premiumComparison.delta || 0) : '—'}
+                  </strong>
+                  <small id="calc-premium-note">
+                    {pricesComplete
+                      ? `ahorro ${fmt(result?.premiumComparison.taxSaved || 0)} p`
+                      : 'Precios pendientes'}
+                  </small>
+                </div>
+              </div>
+              <p className="hint">
+                La tarifa de orden (2,5 %) es igual con y sin Premium: cambia solo el impuesto de transacción.
+              </p>
             </section>
 
             <details className="card notes">
               <summary>Cómo se calcula</summary>
               <div className="notes-body">
-                <p><strong>Impuestos:</strong> 4 % con Premium / 8 % sin Premium sobre el ingreso bruto, más 2,5 % por orden de venta (y por republicación). Tarifa de orden de compra opcional.</p>
-                <p><strong>Estación:</strong> <code>nutrición = valor del ítem × 0,1125 × crafteos</code>; <code>coste = tarifa × nutrición / 100</code>.</p>
-                <p><strong>Materiales:</strong> devolución por material según RRR, con tope <code>maxreturnamount</code>; los artefactos no retornan.</p>
-                <p><strong>Diarios:</strong> fama por crafteo → diarios vacíos <code>ceil</code> y llenos <code>floor</code>.</p>
+                <p>
+                  <strong>Impuestos:</strong> 4 % con Premium / 8 % sin Premium sobre el ingreso bruto, más
+                  2,5 % por orden de venta (y por republicación). Tarifa de orden de compra opcional.
+                </p>
+                <p>
+                  <strong>Estación:</strong> <code>nutrición = valor del ítem × 0,1125 × crafteos</code>;{' '}
+                  <code>coste = tarifa × nutrición / 100</code>.
+                </p>
+                <p>
+                  <strong>Materiales:</strong> devolución por material según RRR, con tope{' '}
+                  <code>maxreturnamount</code>; los artefactos no retornan.
+                </p>
+                <p>
+                  <strong>Diarios:</strong> fama por crafteo → diarios vacíos <code>ceil</code> y llenos{' '}
+                  <code>floor</code>.
+                </p>
               </div>
             </details>
           </div>
@@ -934,31 +1514,62 @@ export default function CalculatorView({
         <div className="work-grid">
           <div className="config-col">
             <section className="card">
-              <div className="card-head"><h2>Comparar ciudades</h2></div>
-              <p className="hint">Calcula la ganancia del ítem actual en cada mercado con una sola petición de precios. Usa la configuración de la pestaña «Calculadora».</p>
-              <button type="button" className="btn primary full" id="calc-compare-btn" disabled={compareBusy}
-                onClick={compareCities}>Comparar en todas las ciudades</button>
-              <p className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')} id="calc-compare-status">{status}</p>
+              <div className="card-head">
+                <h2>Comparar ciudades</h2>
+              </div>
+              <p className="hint">
+                Calcula la ganancia del ítem actual en cada mercado con una sola petición de precios. Usa la
+                configuración de la pestaña «Calculadora».
+              </p>
+              <button
+                type="button"
+                className="btn primary full"
+                id="calc-compare-btn"
+                disabled={compareBusy}
+                onClick={compareCities}
+              >
+                Comparar en todas las ciudades
+              </button>
+              <p
+                className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')}
+                id="calc-compare-status"
+              >
+                {status}
+              </p>
             </section>
           </div>
           <div className="results-col">
             <section className="card">
-              <div className="card-head"><h2>Ganancia por ciudad</h2>
-                <span className="card-tag" id="calc-compare-meta">{compare ? `${compare.length} ciudades · ${item?.id}` : 'Sin datos'}</span>
+              <div className="card-head">
+                <h2>Ganancia por ciudad</h2>
+                <span className="card-tag" id="calc-compare-meta">
+                  {compare ? `${compare.length} ciudades · ${item?.id}` : 'Sin datos'}
+                </span>
               </div>
               <div id="calc-compare-results">
                 {compare?.length ? (
                   <>
-                    <DataTable columns={[
-                      { label: 'Ciudad', render: r => <strong>{r.city}</strong> },
-                      { label: 'Precio', align: 'right', render: r => fmt(r.price) },
-                      { label: 'Ganancia / u', align: 'right', render: r => <span className={r.profit >= 0 ? 'positive' : 'negative'}>{fmt(r.profit)}</span> },
-                      { label: 'ROI', align: 'right', render: r => fmt2(r.roi) + ' %' },
-                      { label: 'Edad', align: 'right', render: r => esc(r.age) },
-                    ]} rows={compare} />
+                    <DataTable
+                      columns={[
+                        { label: 'Ciudad', render: r => <strong>{r.city}</strong> },
+                        { label: 'Precio', align: 'right', render: r => fmt(r.price) },
+                        {
+                          label: 'Ganancia / u',
+                          align: 'right',
+                          render: r => (
+                            <span className={r.profit >= 0 ? 'positive' : 'negative'}>{fmt(r.profit)}</span>
+                          ),
+                        },
+                        { label: 'ROI', align: 'right', render: r => fmt2(r.roi) + ' %' },
+                        { label: 'Edad', align: 'right', render: r => esc(r.age) },
+                      ]}
+                      rows={compare}
+                    />
                     <ProfitBars rows={compare.map(r => ({ city: r.city, profit: r.profit }))} />
                   </>
-                ) : <p className="empty-note">Elegí un ítem y pulsá «Comparar en todas las ciudades».</p>}
+                ) : (
+                  <p className="empty-note">Elegí un ítem y pulsá «Comparar en todas las ciudades».</p>
+                )}
               </div>
             </section>
           </div>

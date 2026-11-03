@@ -47,7 +47,12 @@ const SHOP_CATEGORY_RULES = {
 const REFINED_CRAFTING_CATEGORIES = new Set(['wood', 'ore', 'hide', 'fiber', 'rock']);
 const COOKED_ITEM_PATTERN = /^T\d+_(?:BREAD|PIE|SALAD|SOUP|STEW|OMELETTE|SANDWICH|CAKE|COOKED)(?:_|$)/;
 const EQUIPMENT_CATEGORIES = new Set([
-  'weapons', 'offhands', 'head-armor', 'chest-armor', 'foot-armor', 'accessories',
+  'weapons',
+  'offhands',
+  'head-armor',
+  'chest-armor',
+  'foot-armor',
+  'accessories',
 ]);
 
 function classifySource({ id = '', cat = '', sub = '', ccat = '' } = {}) {
@@ -72,8 +77,10 @@ function classifySource({ id = '', cat = '', sub = '', ccat = '' } = {}) {
   }
   if (shopCategory === 'other') {
     if (shopSubcategory === 'labourers') {
-      return [/FURNITUREITEM_(?:BED|TABLE|TROPHY)(?:_|$)/.test(itemId)
-        ? 'furniture-housing' : 'journals-laborers', 'other.labourers'];
+      return [
+        /FURNITUREITEM_(?:BED|TABLE|TROPHY)(?:_|$)/.test(itemId) ? 'furniture-housing' : 'journals-laborers',
+        'other.labourers',
+      ];
     }
     if (shopSubcategory === 'maps') return ['loot-tokens-other', 'other.maps'];
     if (shopSubcategory === 'guilds') return ['loot-tokens-other', 'other.guild-activity'];
@@ -120,11 +127,12 @@ export function classifyItem(item = {}) {
   const [categoryId, classificationRule] = classifySource(source);
   const sourceSubcategory = String(item.sub || '').toLowerCase();
   const sourceFamily = String(item.sub2 || '').toLowerCase();
-  const subcategoryId = categoryId === 'weapons'
-    ? sourceSubcategory
-    : categoryId === 'head-armor' || categoryId === 'chest-armor' || categoryId === 'foot-armor'
-      ? sourceSubcategory.split('_')[0]
-      : sourceSubcategory || String(item.ccat || '').toLowerCase();
+  const subcategoryId =
+    categoryId === 'weapons'
+      ? sourceSubcategory
+      : categoryId === 'head-armor' || categoryId === 'chest-armor' || categoryId === 'foot-armor'
+        ? sourceSubcategory.split('_')[0]
+        : sourceSubcategory || String(item.ccat || '').toLowerCase();
   return {
     categoryId,
     subcategoryId,

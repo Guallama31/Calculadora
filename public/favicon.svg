@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Calculadora">
+  <rect width="64" height="64" rx="14" fill="#1e5ed0"/>
+  <rect x="14" y="12" width="36" height="12" rx="3" fill="#ffffff" opacity=".92"/>
+  <g fill="#ffffff">
+    <circle cx="21" cy="34" r="4"/>
+    <circle cx="32" cy="34" r="4"/>
+    <circle cx="43" cy="34" r="4"/>
+    <circle cx="21" cy="46" r="4"/>
+    <circle cx="32" cy="46" r="4"/>
+  </g>
+  <rect x="39" y="42" width="8" height="8" rx="2" fill="#d3a12c"/>
+</svg>

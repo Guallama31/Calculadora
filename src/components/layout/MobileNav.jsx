@@ -12,7 +12,7 @@ import { cn } from '../../lib/utils.js';
 export function MobileNav() {
   const { active, navigate } = useApp();
   const [open, setOpen] = React.useState(false);
-  const go = (entry) => {
+  const go = entry => {
     if (entry.moduleId) navigate(entry.moduleId, { tab: entry.tab, strategy: entry.strategy });
     else if (entry.href?.startsWith('http')) window.open(entry.href, '_blank', 'noopener');
     else if (entry.href?.startsWith('/')) window.open(entry.href, '_blank', 'noopener');
@@ -21,10 +21,16 @@ export function MobileNav() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Abrir menú"><Menu className="size-5" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Abrir menú">
+          <Menu className="size-5" />
+        </Button>
       </SheetTrigger>
       <SheetContent>
-        <SheetHeader><SheetTitle><Logo /></SheetTitle></SheetHeader>
+        <SheetHeader>
+          <SheetTitle>
+            <Logo />
+          </SheetTitle>
+        </SheetHeader>
         <ScrollArea>
           <nav className="flex flex-col gap-1">
             {sidebarData.navGroups.map(group => (
@@ -34,15 +40,25 @@ export function MobileNav() {
                   const Icon = entry.icon;
                   return (
                     <React.Fragment key={entry.label}>
-                      <button type="button" onClick={() => go(entry)}
-                        className={cn('sheet-link', entry.moduleId === active && 'active')}>
-                        <Icon className="size-4" />{entry.label}
+                      <button
+                        type="button"
+                        onClick={() => go(entry)}
+                        className={cn('sheet-link', entry.moduleId === active && 'active')}
+                      >
+                        <Icon className="size-4" />
+                        {entry.label}
                       </button>
                       {entry.children?.map(child => {
                         const ChildIcon = child.icon;
                         return (
-                          <button type="button" key={child.label} onClick={() => go(child)} className="sheet-link sub">
-                            <ChildIcon className="size-4" />{child.label}
+                          <button
+                            type="button"
+                            key={child.label}
+                            onClick={() => go(child)}
+                            className="sheet-link sub"
+                          >
+                            <ChildIcon className="size-4" />
+                            {child.label}
                           </button>
                         );
                       })}
@@ -58,7 +74,8 @@ export function MobileNav() {
                 const Icon = entry.icon;
                 return (
                   <button type="button" key={entry.label} onClick={() => go(entry)} className="sheet-link">
-                    <Icon className="size-4" />{entry.label}
+                    <Icon className="size-4" />
+                    {entry.label}
                   </button>
                 );
               })}
