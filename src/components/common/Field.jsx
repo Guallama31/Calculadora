@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { cn } from '../../lib/utils.js';
 
 export function Field({ label, children, hint, hidden, className }) {

@@ -412,3 +412,24 @@ input[type="checkbox"]:checked + .switch::after { transform: translateX(15px); }
 .mount-price-status:not(:empty) { padding-top: 8px; border-top: 1px solid var(--border); }
 .mount-price-status.loading { color: var(--blue-dark); }
 .mount-cost-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+
+/* Barrera de errores: nunca una pantalla en blanco. */
+.error-boundary { display: flex; justify-content: center; padding: 28px 18px; }
+.error-boundary-card {
+  width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.error-boundary-card h2 { font-size: 17px; }
+.error-boundary-reason {
+  margin: 0; padding: 9px 12px; border-radius: 8px; font-size: 12.5px;
+  background: var(--red-soft); border: 1px solid #f0c9c9; color: var(--red);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere;
+}
+.error-boundary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* Aviso cuando el catálogo no registra item value (la estación quedaría en 0). */
+.hint.warn {
+  padding: 8px 10px; border: 1px solid var(--gold-line); border-radius: 8px;
+  background: var(--gold-soft); color: var(--amber);
+}

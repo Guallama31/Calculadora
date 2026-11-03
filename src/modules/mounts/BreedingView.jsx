@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { CITIES, TAX } from '../../settings/index.js';
-import { MOUNT_BREEDING, MOUNT_FOODS } from '../../../data/catalog.js';
+import * as catalog from '../../services/catalog.js';
 import * as api from '../../services/api.js';
 import { ageFromDate, fmt, fmt1 } from '../../services/format.js';
 import { useApp } from '../../app/AppContext.jsx';
@@ -10,7 +10,9 @@ import { calculateBreeding, foodPlan } from '../../services/mount-breeding.js';
 
 const CITY_OPTIONS = CITIES.map(city => ({ value: city.value, label: city.label }));
 const buyPriceMode = mode => mode === 'instant' ? 'sell' : 'buy';
-const sellPriceMode = mode => mode === 'instant' ? 'sell' : 'buy';
+/* Vender en el acto se cruza contra las órdenes de compra (`buy_price_max`);
+   publicar una orden de venta usa `sell_price_min`. Igual que CalculatorView/scanner. */
+const sellPriceMode = mode => mode === 'instant' ? 'buy' : 'sell';
 
 function priceIsSet(value) {
   return value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -50,11 +52,15 @@ export default function BreedingView() {
   const [busy, setBusy] = React.useState(false);
   const [refresh, setRefresh] = React.useState(0);
   const requestId = React.useRef(0);
+  const requestAbort = React.useRef(null);
 
-  const animal = React.useMemo(() => MOUNT_BREEDING.find(entry => entry.id === animalId) || null, [animalId]);
+  const breeding = catalog.mountBreeding();
+  const allFoods = catalog.mountFoods();
+  const animal = React.useMemo(() => breeding.find(entry => entry.id === animalId) || null,
+    [animalId, breeding]);
   const foods = React.useMemo(() => animal
-    ? MOUNT_FOODS.filter(food => animal.foodCategories.includes(food.category))
-    : [], [animal]);
+    ? allFoods.filter(food => animal.foodCategories.includes(food.category))
+    : [], [animal, allFoods]);
   const favoriteFood = animal?.favoriteFoodId
     ? foods.find(entry => entry.id === animal.favoriteFoodId) || null
     : null;
@@ -126,12 +132,15 @@ export default function BreedingView() {
     }
 
     const currentRequest = ++requestId.current;
+    requestAbort.current?.abort();
+    const controller = new AbortController();
+    requestAbort.current = controller;
     setPrices({});
     setBusy(true);
     setStatus('Consultando precios…');
     const cities = [...new Set([buyCity, sellCity])];
     const ids = [...new Set([animal.id, animal.grownId, food.id])];
-    api.fetchPrices({ server: shared.server, quality: shared.quality, ids, cities })
+    api.fetchPrices({ server: shared.server, quality: shared.quality, ids, cities, signal: controller.signal })
       .then(rows => {
         if (requestId.current !== currentRequest) return;
         const map = api.indexRows(rows);
@@ -152,13 +161,14 @@ export default function BreedingView() {
         setBusy(false);
       })
       .catch(error => {
-        if (requestId.current !== currentRequest) return;
+        if (requestId.current !== currentRequest || api.isAbortError(error)) return;
         setStatus(`No se pudieron consultar los precios: ${error.message}`);
         setBusy(false);
       });
 
     return () => {
       requestId.current += 1;
+      controller.abort();
     };
   }, [animal, food, buyCity, sellCity, buyMode, sellMode, shared.server, shared.quality, refresh]);
 
@@ -206,7 +216,7 @@ export default function BreedingView() {
         <section className="card">
           <div className="card-head"><h2>Plan de crianza</h2><span className="card-tag">Datos del juego</span></div>
           <Select id="mount-breeding-animal" label="Cría que querés criar"
-            options={[{ value: '', label: 'Elegí una cría…' }, ...MOUNT_BREEDING.map(entry => ({
+            options={[{ value: '', label: 'Elegí una cría…' }, ...breeding.map(entry => ({
               value: entry.id,
               label: `T${entry.tier} · ${entry.es}`,
             }))]}

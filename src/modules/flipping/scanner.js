@@ -105,7 +105,7 @@ export function allCities(options) {
   return uniq(sourceCities(options).concat(sellCities(options)));
 }
 
-async function fetchAll(options, ids, cities, onProgress, quality = options.quality) {
+async function fetchAll(options, ids, cities, { onProgress, quality = options.quality, signal } = {}) {
   const chunks = api.chunkPriceIds({
     server: options.server, ids, cities, quality,
   });
@@ -115,7 +115,7 @@ async function fetchAll(options, ids, cities, onProgress, quality = options.qual
   for (let i = 0; i < chunks.length; i++) {
     onProgress?.({ done: i, total: chunks.length, message: `Lote ${i + 1} de ${chunks.length}` });
     const batch = await api.fetchPrices({
-      server: options.server, ids: chunks[i], cities, quality,
+      server: options.server, ids: chunks[i], cities, quality, signal,
       onRequest: request => {
         if (request.initiated) requests += 1;
         if (request.deduplicated) deduplicated += 1;
@@ -265,13 +265,18 @@ function evaluate(options, candidates, map, meta) {
         roi = result.roi;
         margin = result.margin;
       }
+      /* Las columnas de coste, venta y ganancia son por unidad; los impuestos
+         también se normalizan por unidad para que la fila sea homogénea. */
+      const units = isCraft ? Math.max(1, result.outputQty) : 1;
+      const perUnit = value => (Number(value) || 0) / units;
       rows.push({
         id: entry.id, item: entry, strategy: options.strategy,
         craftCity, buyCity: buyCityLabel, sellCity,
         buyPrice: isCraft ? null : (isUpgrade ? materialPrices[0].price : buyQuote.price), sellPrice: sale.price,
-        costPerUnit, revenuePerUnit, salesTax: result.salesTax, setupFee: result.setupFee,
-        stationFee: result.stationFee || 0, buyOrderFee: result.buyOrderFee || 0,
-        profit, roi, margin, rrr, age, sellMode: citySellMode,
+        costPerUnit, revenuePerUnit,
+        salesTax: perUnit(result.salesTax), setupFee: perUnit(result.setupFee),
+        stationFee: perUnit(result.stationFee || 0), buyOrderFee: perUnit(result.buyOrderFee || 0),
+        profit, roi, margin, rrr, age,
         buyDate: isCraft ? null : (buyQuote.date || null), sellDate: sale.date || null,
         materialPrices, quality, buyMode, sellMode: citySellMode,
         focus: !!options.focus, dailyBonus: options.dailyBonus || 0,
@@ -285,7 +290,7 @@ function evaluate(options, candidates, map, meta) {
   return rows.slice(0, MAX_RESULTS);
 }
 
-export async function scan(options, onProgress) {
+export async function scan(options, onProgress, signal = null) {
   if (!catalog.total) throw new Error('El catálogo no está cargado.');
   const candidates = selectCandidates(options);
   if (!candidates.length) {
@@ -298,10 +303,10 @@ export async function scan(options, onProgress) {
   const ids = neededIds(candidates, options.strategy);
   const cities = allCities(options);
   onProgress?.({ done: 0, total: null, message: `Consultando ${ids.length} IDs en ${cities.length} ciudades…` });
-  let fetched = await fetchAll(options, ids, cities, onProgress);
+  let fetched = await fetchAll(options, ids, cities, { onProgress, signal });
   if (options.strategy === 'upgrade' && Number(options.quality || 1) !== 1) {
     const resourceIds = uniq(candidates.map(entry => entry.upgrade.id));
-    const resources = await fetchAll(options, resourceIds, cities, onProgress, 1);
+    const resources = await fetchAll(options, resourceIds, cities, { onProgress, signal, quality: 1 });
     fetched = {
       map: new Map([...fetched.map, ...resources.map]),
       rows: fetched.rows + resources.rows,

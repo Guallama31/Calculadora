@@ -30,6 +30,7 @@ export default function PricesView({ meta }) {
   const [cacheBusy, setCacheBusy] = React.useState(false);
   const [cacheStatus, setCacheStatus] = React.useState('');
   const requestId = React.useRef(0);
+  const requestAbort = React.useRef(null);
 
   const refreshCacheInfo = React.useCallback(async () => {
     try {
@@ -53,11 +54,14 @@ export default function PricesView({ meta }) {
   const load = React.useCallback(async () => {
     if (!item) { setStatus('Elegí un ítem primero.'); return; }
     const currentRequest = ++requestId.current;
+    requestAbort.current?.abort();
+    const controller = new AbortController();
+    requestAbort.current = controller;
     setBusy(true);
     setStatus('Consultando AODP…');
     try {
       const all = await api.fetchPrices({ server: shared.server, ids: [item.id],
-        cities: CITIES.map(c => c.value), quality: shared.quality });
+        cities: CITIES.map(c => c.value), quality: shared.quality, signal: controller.signal });
       if (currentRequest !== requestId.current) return;
       const map = api.indexRows(all);
       const list = CITIES.map(c => {
@@ -74,7 +78,7 @@ export default function PricesView({ meta }) {
       setCityRows(list);
 
       const qualities = await api.fetchPrices({ server: shared.server, ids: [item.id],
-        cities: [city], quality: '1,2,3,4,5' });
+        cities: [city], quality: '1,2,3,4,5', signal: controller.signal });
       if (currentRequest !== requestId.current) return;
       const qmap = api.indexRows(qualities);
       setQualityRows(QUALITIES.map(q => {
@@ -88,7 +92,8 @@ export default function PricesView({ meta }) {
       setStatus(`✔ Consulta completada. Las celdas sin cotización indican «No se registra precio». ${api.cacheNotice([...all, ...qualities])}`);
       await refreshCacheInfo();
     } catch (error) {
-      if (currentRequest === requestId.current) setStatus('✖ ' + error.message);
+      if (currentRequest !== requestId.current || api.isAbortError(error)) return;
+      setStatus('✖ ' + error.message);
     } finally {
       if (currentRequest === requestId.current) setBusy(false);
     }
@@ -114,6 +119,10 @@ export default function PricesView({ meta }) {
     const timer = setTimeout(() => { void load(); }, 250);
     return () => clearTimeout(timer);
   }, [item, load]);
+
+  React.useEffect(() => () => {
+    requestAbort.current?.abort();
+  }, []);
 
   return (
     <div className="module-view" data-module="prices">

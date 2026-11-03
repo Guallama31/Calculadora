@@ -52,6 +52,7 @@ export function GlobalSearch() {
     <div className="global-search" ref={boxRef}>
       <Search className="global-search-icon size-4" />
       <Input type="search" placeholder="Buscar módulos o ítems…" aria-label="Búsqueda global"
+        aria-expanded={open && !!query.trim()} aria-controls="global-search-popover"
         value={query} onChange={e => {
           setQuery(e.target.value);
           setOpen(true);
@@ -59,7 +60,7 @@ export function GlobalSearch() {
         }}
         onFocus={() => setOpen(true)} onKeyDown={onKeyDown} />
       {open && query.trim() && (
-        <div className="search-popover">
+        <div className="search-popover" id="global-search-popover" role="group" aria-label="Resultados de búsqueda">
           {!results.modules.length && !results.items.length && <div className="search-hint">Sin resultados para «{query}».</div>}
           {results.modules.length > 0 && (
             <>

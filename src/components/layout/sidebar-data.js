@@ -44,6 +44,7 @@ export const NAV_GROUPS = [
       item('flipping', [
         { label: 'Flip', icon: ArrowLeftRight, moduleId: 'flipping', href: '#flipping', strategy: 'flip' },
         { label: 'Royal → BM', icon: ArrowLeftRight, moduleId: 'flipping', href: '#flipping', strategy: 'royalbm' },
+        { label: 'Mejora', icon: ArrowLeftRight, moduleId: 'flipping', href: '#flipping', strategy: 'upgrade' },
         { label: 'Craft Trades', icon: ArrowLeftRight, moduleId: 'flipping', href: '#flipping', strategy: 'craft' },
         { label: 'Refining Trades', icon: ArrowLeftRight, moduleId: 'flipping', href: '#flipping', strategy: 'refine' },
       ]),

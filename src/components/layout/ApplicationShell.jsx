@@ -1,4 +1,3 @@
-import { Button } from '../ui/button.jsx';
 import { MobileNav } from './MobileNav.jsx';
 import { GlobalSearch } from './GlobalSearch.jsx';
 import { Logo } from './Logo.jsx';

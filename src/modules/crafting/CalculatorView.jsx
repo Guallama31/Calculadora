@@ -1,11 +1,11 @@
-/* Vista de calculadora reutilizable por los 8 módulos de producción (React). */
+/* Vista de calculadora reutilizable por los 7 módulos de producción (React). */
 import * as React from 'react';
-import { CITIES, CRAFT_CITIES, TAX } from '../../settings/index.js';
+import { CITIES, CRAFT_CITIES } from '../../settings/index.js';
 import * as catalog from '../../services/catalog.js';
 import * as api from '../../services/api.js';
 import * as engine from '../../services/engine.js';
 import { bonusFor, bestCityFor, cityLabel } from '../../services/bonus.js';
-import { esc, fmt, fmt1, fmt2, ageFromDate } from '../../services/format.js';
+import { esc, fmt, fmt2, ageFromDate } from '../../services/format.js';
 import { useApp } from '../../app/AppContext.jsx';
 import { Select, NumberField, Toggle } from '../../components/common/Field.jsx';
 import { Tabs } from '../../components/common/Tabs.jsx';
@@ -47,7 +47,7 @@ function lowestRecordedPrice(map, id, cities, quality, mode) {
 export default function CalculatorView({
   moduleId, scopeLabel = 'Catálogo completo', filter = null, meta, showModuleHead = true,
 }) {
-  const { shared, prefs, setPrefs, pending, navigate } = useApp();
+  const { shared, prefs, setPrefs, pending } = useApp();
   const Icon = MODULE_ICONS[moduleId];
   const isEnchanting = moduleId === 'enchanting';
   const isRefining = moduleId === 'refining';
@@ -84,6 +84,8 @@ export default function CalculatorView({
   const [compareBusy, setCompareBusy] = React.useState(false);
   const autoPriceRequest = React.useRef('');
   const priceLoadId = React.useRef(0);
+  const priceAbort = React.useRef(null);
+  const compareAbort = React.useRef(null);
 
   const refiningEntries = React.useMemo(
     () => catalog.entries.filter(entry => entry.refine),
@@ -227,7 +229,7 @@ export default function CalculatorView({
       if (selected) applyItem(selected);
       else setItem(null);
     }
-  }, [isRefining, refiningEntries, refiningType, refiningTier, refiningLevel, item]);
+  }, [isRefining, refiningEntries, refiningType, refiningTier, refiningLevel, item]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyItem(entry) {
     if (!entry) {
@@ -366,14 +368,19 @@ export default function CalculatorView({
       ...(showSellCityPrices ? CITIES.map(city => city.value) : []),
     ])];
     const currentRequest = ++priceLoadId.current;
+    priceAbort.current?.abort();
+    const controller = new AbortController();
+    priceAbort.current = controller;
     autoPriceRequest.current = priceRequestSignature;
     setBusy(true);
-    setSaleQuotes(null);
+    /* Al recargar el mismo ítem se conserva la comparación anterior hasta que
+       llegue la nueva (evita que la tabla parpadee); si cambia el ítem, se limpia. */
+    setSaleQuotes(current => (current && current.itemId === item?.id ? current : null));
     setStatus('Consultando precios…');
     try {
       const rows = await api.fetchPrices({
         server: shared.server, quality: shared.quality,
-        ids: list.map(t => t.id), cities,
+        ids: list.map(t => t.id), cities, signal: controller.signal,
       });
       if (currentRequest !== priceLoadId.current) return;
       const map = api.indexRows(rows);
@@ -425,11 +432,19 @@ export default function CalculatorView({
       const hasGlobalTarget = list.some(target => target.city === 'Global');
       setStatus(`✔ Precios actualizados · ${rows.length} registros recibidos.${missingCount ? ` ${missingCount} precios sin registrar; cargalos manualmente.` : ''}${hasGlobalTarget ? ' Menor precio registrado por ciudad, sin promediar.' : ''}${bestCityLabel ? ` Mejor precio de venta: ${bestCityLabel}.` : ''}${api.cacheNotice(rows) ? ` ${api.cacheNotice(rows)}` : ''}`);
     } catch (error) {
-      if (currentRequest === priceLoadId.current) setStatus('✖ ' + error.message);
+      /* Una consulta cancelada por un cambio de configuración no es un error. */
+      if (currentRequest !== priceLoadId.current || api.isAbortError(error)) return;
+      setStatus('✖ ' + error.message);
     } finally {
       if (currentRequest === priceLoadId.current) setBusy(false);
     }
   }
+
+  /* Al desmontar la vista se cancela la consulta en curso. */
+  React.useEffect(() => () => {
+    priceAbort.current?.abort();
+    compareAbort.current?.abort();
+  }, []);
 
   React.useEffect(() => {
     if (!priceRequestSignature || autoPriceRequest.current === priceRequestSignature) return undefined;
@@ -439,16 +454,19 @@ export default function CalculatorView({
       void loadPrices();
     }, 250);
     return () => clearTimeout(timer);
-  }, [priceRequestSignature]);
+  }, [priceRequestSignature]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function compareCities() {
     if (!item) { setStatus('Elegí un ítem primero.'); return; }
+    compareAbort.current?.abort();
+    compareAbort.current = new AbortController();
     const ids = [item.id, ...recipeResources.map(r => r.id)];
     const cities = CITIES.map(c => c.value);
     setCompareBusy(true);
     setStatus('Comparando ciudades…');
     try {
       const rows = await api.fetchPrices({ server: shared.server, quality: shared.quality, ids, cities,
+        signal: compareAbort.current?.signal,
       });
       const map = api.indexRows(rows);
       const buyPriceMode = cfg.buyMode === 'instant' ? 'sell' : 'buy';
@@ -485,7 +503,7 @@ export default function CalculatorView({
       setCompare(list);
       setStatus(list.length ? '✔ Comparación lista.' : '✖ Sin precios suficientes.');
     } catch (error) {
-      setStatus('✖ ' + error.message);
+      if (!api.isAbortError(error)) setStatus('✖ ' + error.message);
     } finally { setCompareBusy(false); }
   }
 
@@ -723,6 +741,12 @@ export default function CalculatorView({
               {(!isEnchanting || craftingEnabled) && <p className="hint" id="calc-station-info">
                 Nutrición por crafteo: {fmt2(result?.nutritionPerRun || 0)} · total: {fmt2(result?.nutritionTotal || 0)} · coste: {fmt(result?.stationFee || 0)} p
               </p>}
+              {(!isEnchanting || craftingEnabled) && item && !(item.value > 0) && (
+                <p className="hint warn" id="calc-station-value-warning">
+                  El catálogo no registra un <em>item value</em> para este ítem, así que la nutrición y la
+                  tasa de estación se calculan en 0. Verificá el coste real en el juego antes de decidir.
+                </p>
+              )}
               {isEnchanting && !craftingEnabled && (
                 <p className="hint" id="calc-crafting-disabled">
                   Los bonus de crafteo y la tasa de estación solo se aplican si crafteás el ítem base.

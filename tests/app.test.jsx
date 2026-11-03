@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { AppProvider } from '../src/app/AppContext.jsx';
@@ -9,7 +8,6 @@ import { CITIES } from '../src/settings/index.js';
 import { fmt, fmt2 } from '../src/services/format.js';
 
 const renderApp = () => render(<AppProvider><App /></AppProvider>);
-const byText = text => screen.getByText(text, { exact: false });
 const navigateFromMenu = async (container, label, moduleId) => {
   fireEvent.click(container.querySelector('[aria-label="Abrir menú"]'));
   await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
@@ -307,6 +305,8 @@ describe('Calculadora', () => {
     fireEvent.click(container.querySelector('#calc-sale-price').parentElement
       .querySelector('button.btn.ghost'));
     await waitFor(() => expect(Number(container.querySelector('#calc-sale-price').value)).not.toBe(1));
+    await waitFor(() => expect(container.querySelectorAll('#calc-sale-city-prices tbody tr').length)
+      .toBeGreaterThan(0));
     const bestSaleCity = [...container.querySelectorAll('#calc-sale-city-prices tbody tr')]
       .find(row => row.textContent.includes('Mejor precio'));
     expect(bestSaleCity).toBeTruthy();
@@ -351,7 +351,8 @@ describe('Calculadora', () => {
     await waitFor(() => expect(container.querySelector('#prices-cities').textContent)
       .toContain('No se registra precio'));
     expect(container.querySelectorAll('#prices-cities tbody tr')).toHaveLength(CITIES.length);
-    expect(container.querySelector('#prices-status').textContent).toContain('Consulta completada');
+    await waitFor(() => expect(container.querySelector('#prices-status').textContent)
+      .toContain('Consulta completada'));
   });
 
   it('ofrece la caché local como referencia anterior cuando AODP no está disponible', async () => {

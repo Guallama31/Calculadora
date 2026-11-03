@@ -137,6 +137,9 @@ export function ItemSelector({ id = 'item', placeholder = 'Buscar por nombre o I
       <div className="search-wrap">
         <input type="search" id={`${id}-search`} className="item-search" placeholder={placeholder}
           autoComplete="off" spellCheck="false" value={query}
+          role="combobox" aria-autocomplete="list" aria-expanded={open}
+          aria-controls={`${id}-suggestions`}
+          aria-activedescendant={open && cursor >= 0 ? `${id}-option-${cursor}` : undefined}
           onChange={e => {
             setQuery(e.target.value);
             setOpen(true);
@@ -145,9 +148,11 @@ export function ItemSelector({ id = 'item', placeholder = 'Buscar por nombre o I
           }}
           onFocus={() => setOpen(true)} onKeyDown={onKeyDown} />
         {open && (
-          <div className="suggestions" id={`${id}-suggestions`} ref={listRef}>
+          <div className="suggestions" id={`${id}-suggestions`} ref={listRef}
+            role="listbox" aria-label="Sugerencias de ítems">
             {suggestions.length ? suggestions.map((entry, i) => (
-              <div key={entry.id} data-index={i} data-id={entry.id}
+              <div key={entry.id} data-index={i} data-id={entry.id} id={`${id}-option-${i}`}
+                role="option" aria-selected={i === cursor}
                 className={cn('suggestion', i === cursor && 'active')} onMouseDown={e => e.preventDefault()}
                 onClick={() => select(entry)}>
                 <img src={catalog.icon(entry.id, quality)} alt="" loading="lazy" />

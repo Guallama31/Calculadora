@@ -1,31 +1,60 @@
-/* Catálogo de ítems: índice, búsqueda tolerante a acentos y resolución de variantes. */
-import { CATALOG } from '../../data/catalog.js';
+/* Catálogo de ítems: índice, búsqueda tolerante a acentos y resolución de variantes.
+
+   El catálogo pesa ~5 MB, así que `data/catalog.js` se carga con `import()`
+   dinámico desde `main.jsx` y se registra aquí mediante `initializeCatalog()`.
+   Las vistas consumen este servicio y no el módulo de datos, para que el
+   arranque pueda mostrar un estado de carga y el catálogo quede en un chunk
+   independiente (cacheable entre despliegues). */
 import { normalize } from './format.js';
 import { categoryLabel, classifyItem, subcategoryLabel } from './item-taxonomy.js';
 
 const RENDER = 'https://render.albiononline.com/v1/item/';
 const byId = new Map();
 const byBase = new Map();
-const index = [];
-const entries = CATALOG.map(entry => ({ ...entry, ...classifyItem(entry) }));
+let index = [];
+const entries = [];
+let total = 0;
+let mountBreeds = [];
+let mountFoodList = [];
+let ready = false;
 
-entries.forEach((entry, position) => {
-  byId.set(entry.id, entry);
-  if (!byBase.has(entry.base)) byBase.set(entry.base, []);
-  byBase.get(entry.base).push(entry);
-  index.push({
-    position,
-    id: normalize(entry.id),
-    name: normalize(`${entry.es} ${entry.en}`),
-    text: normalize([
-      entry.es, entry.en, entry.id, entry.cat, entry.sub, entry.sub2,
-      categoryLabel(entry.categoryId), entry.categoryId, entry.subcategoryId, entry.familyId, ...entry.tags,
-    ].join(' ')),
+export { entries, total };
+export const isReady = () => ready;
+export const mountBreeding = () => mountBreeds;
+export const mountFoods = () => mountFoodList;
+
+export function initializeCatalog({ CATALOG = [], MOUNT_BREEDING = [], MOUNT_FOODS = [] } = {}) {
+  entries.length = 0;
+  index = [];
+  byId.clear();
+  byBase.clear();
+
+  CATALOG.forEach((entry, position) => {
+    const classified = { ...entry, ...classifyItem(entry) };
+    entries.push(classified);
+    byId.set(classified.id, classified);
+    if (!byBase.has(classified.base)) byBase.set(classified.base, []);
+    byBase.get(classified.base).push(classified);
+    index.push({
+      position,
+      id: normalize(classified.id),
+      name: normalize(`${classified.es} ${classified.en}`),
+      text: normalize([
+        classified.es, classified.en, classified.id, classified.cat, classified.sub, classified.sub2,
+        categoryLabel(classified.categoryId), classified.categoryId, classified.subcategoryId,
+        classified.familyId, ...classified.tags,
+      ].join(' ')),
+    });
   });
-});
 
-export { categoryLabel, entries, subcategoryLabel };
-export const total = entries.length;
+  total = entries.length;
+  mountBreeds = MOUNT_BREEDING;
+  mountFoodList = MOUNT_FOODS;
+  ready = true;
+  return { total, breeding: mountBreeds.length, foods: mountFoodList.length };
+}
+
+export { categoryLabel, subcategoryLabel };
 
 export function get(id) { return byId.get(id) || null; }
 export function variants(base) {

@@ -1,8 +1,8 @@
 /* Módulo Flipping / TRADES con estrategias por pestañas horizontales. */
 import * as React from 'react';
-import { CITIES, CRAFT_CITIES, CATEGORIES, QUALITIES, ROYAL_CITIES, BLACK_MARKET } from '../../settings/index.js';
+import { CITIES, CRAFT_CITIES, CATEGORIES, QUALITIES, ROYAL_CITIES } from '../../settings/index.js';
 import * as catalog from '../../services/catalog.js';
-import { esc, fmt, fmt1, fmt2, ageInfo, profitClass } from '../../services/format.js';
+import { fmt, fmt1, fmt2, ageInfo, profitClass } from '../../services/format.js';
 import { useApp } from '../../app/AppContext.jsx';
 import { Select, NumberField, Toggle } from '../../components/common/Field.jsx';
 import { Tabs } from '../../components/common/Tabs.jsx';
@@ -10,6 +10,7 @@ import { DataTable } from '../../components/common/DataTable.jsx';
 import { ResultGrid } from '../../components/common/ResultCard.jsx';
 import { MODULE_ICONS } from '../../components/layout/sidebar-data.js';
 import { scan, STRATEGIES, describe } from './scanner.js';
+import { isAbortError } from '../../services/api.js';
 import { cn } from '../../lib/utils.js';
 
 const DEFAULTS = {
@@ -35,6 +36,7 @@ export default function ScannerView({ meta }) {
   const [progress, setProgress] = React.useState(0);
   const busyRef = React.useRef(false);
   const runRef = React.useRef(null);
+  const scanAbort = React.useRef(null);
   const set = (key, value) => setOpts(current => ({ ...current, [key]: value }));
   const isCraft = strategy === 'craft' || strategy === 'refine';
   const current = STRATEGIES.find(s => s.id === strategy);
@@ -42,6 +44,9 @@ export default function ScannerView({ meta }) {
   async function run() {
     if (busyRef.current) return;
     busyRef.current = true;
+    scanAbort.current?.abort();
+    const controller = new AbortController();
+    scanAbort.current = controller;
     setBusy(true); setRows([]); setSummary(null); setProgress(5);
     setStatus('Consultando precios…');
     try {
@@ -61,7 +66,7 @@ export default function ScannerView({ meta }) {
       }, p => {
         setStatus(p.message);
         if (p.total) setProgress(Math.max(5, p.done / p.total * 100));
-      });
+      }, controller.signal);
       setSummary({
         candidates: result.candidates, requests: result.requests, prices: result.prices,
         deduplicated: result.deduplicated, coverage: result.coverage,
@@ -73,11 +78,17 @@ export default function ScannerView({ meta }) {
         ? `✔ ${result.rows.length} mejores oportunidades por ganancia neta. Verificá los precios en el juego. ${result.cacheNotice}`
         : `✔ Búsqueda terminada sin resultados. ${result.cacheNotice}`);
     } catch (error) {
-      setStatus('✖ ' + error.message);
+      if (isAbortError(error)) setStatus('Consulta cancelada.');
+      else setStatus('✖ ' + error.message);
     } finally {
+      if (scanAbort.current === controller) scanAbort.current = null;
       busyRef.current = false;
       setBusy(false);
     }
+  }
+
+  function cancel() {
+    scanAbort.current?.abort();
   }
 
   function changeStrategy(id) {
@@ -90,7 +101,10 @@ export default function ScannerView({ meta }) {
     const timer = setInterval(() => {
       if (!busyRef.current) void runRef.current();
     }, AUTO_SCAN_INTERVAL_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      scanAbort.current?.abort();
+    };
   }, []);
 
   function setGlobalScan(enabled) {
@@ -251,6 +265,11 @@ export default function ScannerView({ meta }) {
             <button type="button" className="btn primary full" id="scan-run" disabled={busy} onClick={run}>
               Buscar oportunidades
             </button>
+            {busy && (
+              <button type="button" className="btn ghost full" id="scan-cancel" onClick={cancel}>
+                Cancelar búsqueda
+              </button>
+            )}
             <p className={cn('status', /^✔/.test(status) && 'ok', /^✖/.test(status) && 'err')} id="scan-status">{status}</p>
             <p className="hint">Actualización automática cada 15 minutos mientras Flipping esté abierto. Los resultados se ordenan por ganancia neta.</p>
           </section>

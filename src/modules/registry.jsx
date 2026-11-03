@@ -1,4 +1,3 @@
-import * as React from 'react';
 import CalculatorView from './crafting/CalculatorView.jsx';
 import ScannerView from './flipping/ScannerView.jsx';
 import PricesView from './prices/PricesView.jsx';

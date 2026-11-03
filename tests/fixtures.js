@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 
 export function installFetch({ mode = 'ok', discount = 420, missingCity = null, missingItem = null } = {}) {
   const now = new Date().toISOString();
-  const spy = vi.fn(async (url, options) => {
+  const spy = vi.fn(async (url, _options) => {
     if (mode === '429') {
       return { ok: false, status: 429,
         headers: { get: k => k === 'RateLimit-Reset' ? String(Math.floor(Date.now() / 1000) + 45) : null },

@@ -5,6 +5,10 @@ export const PRICE_CACHE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 let databasePromise;
 
+function resetDatabase() {
+  databasePromise = null;
+}
+
 function requestResult(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -27,15 +31,22 @@ function openDatabase() {
     };
     request.onsuccess = () => {
       const database = request.result;
-      database.onversionchange = () => database.close();
+      /* Si otra pestaña actualiza el esquema, la base se cierra: hay que soltar
+         la promesa cacheada para poder reabrirla en vez de usar una conexión
+         cerrada (InvalidStateError en toda transacción posterior). */
+      database.onversionchange = () => {
+        database.close();
+        resetDatabase();
+      };
+      database.onclose = () => resetDatabase();
       resolve(database);
     };
     request.onerror = () => {
-      databasePromise = null;
+      resetDatabase();
       reject(request.error || new Error('No se pudo abrir la caché local.'));
     };
     request.onblocked = () => {
-      databasePromise = null;
+      resetDatabase();
       reject(new Error('La caché local está bloqueada por otra pestaña.'));
     };
   });
@@ -85,23 +96,56 @@ export async function writePriceRows(server, rows, receivedAt = Date.now()) {
     && (validQuote(row, 'buy') || validQuote(row, 'sell')));
   if (!validRows.length) return 0;
   const database = await openDatabase();
-  await new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    validRows.forEach(row => {
-      const incoming = { ...row, server };
-      const key = priceCacheKey({
-        server, itemId: incoming.item_id, city: incoming.city, quality: incoming.quality,
+  const failed = [];
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const failRow = row => {
+        if (!failed.includes(row)) failed.push(row);
+      };
+      validRows.forEach(row => {
+        const incoming = { ...row, server };
+        const key = priceCacheKey({
+          server, itemId: incoming.item_id, city: incoming.city, quality: incoming.quality,
+        });
+        try {
+          const request = store.get(key);
+          request.onsuccess = () => {
+            try {
+              const put = store.put(mergeObservation(request.result, incoming, receivedAt));
+              /* Una fila inválida no debe tumbar el lote completo: se descarta
+                 esa fila y la transacción sigue viva. */
+              put.onerror = event => { event.preventDefault?.(); event.stopPropagation?.(); failRow(row); };
+            } catch {
+              failRow(row);
+            }
+          };
+          request.onerror = event => {
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            failRow(row);
+          };
+        } catch {
+          failRow(row);
+        }
       });
-      const request = store.get(key);
-      request.onsuccess = () => store.put(mergeObservation(request.result, incoming, receivedAt));
-      request.onerror = () => transaction.abort();
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
+      transaction.onabort = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
     });
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
-    transaction.onabort = () => reject(transaction.error || new Error('No se pudo guardar la caché local.'));
-  });
-  return validRows.length;
+  } catch (error) {
+    /* Conexión cerrada por otra pestaña o base invalidada: se descarta para
+       poder reabrir en la próxima consulta. */
+    if (error?.name === 'InvalidStateError') resetDatabase();
+    throw error;
+  }
+  /* Si no se pudo guardar ninguna fila, se informa para que la vista lo muestre;
+     si se guardó al menos una, la caché sigue siendo útil. */
+  if (failed.length && failed.length === validRows.length) {
+    throw new Error('No se pudo guardar ninguna cotización en la caché local.');
+  }
+  return validRows.length - failed.length;
 }
 
 export async function readPriceRows({ server, ids, cities, qualities }) {
