@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import * as catalog from '../src/services/catalog.js';
 import { CATALOG } from '../data/catalog.js';
+import { ItemSelector } from '../src/components/common/ItemSelector.jsx';
 
 /* El dump del juego no nombra los mapas de mazmorra ni varias monturas de
    evento; el generador las marca con `untranslated: true` para que la
@@ -32,5 +34,15 @@ describe('catálogo: ítems sin nombre en el dump', () => {
     const flagged = catalog.mountFoods().filter(entry => catalog.isUntranslated(entry));
     expect(flagged.length).toBeGreaterThan(0);
     flagged.forEach(entry => expect(entry.es).toBe(entry.id));
+  });
+
+  it('la ficha del ítem aclara cuando el nombre viene del ID', () => {
+    const raw = CATALOG.find(entry => entry.untranslated && entry.lvl === 0);
+    const { unmount } = render(<ItemSelector id="sinNombre" value={raw.id} />);
+    expect(screen.getByText('sin nombre en el dump')).toBeTruthy();
+    unmount();
+    const named = CATALOG.find(entry => !entry.untranslated && entry.lvl === 0);
+    render(<ItemSelector id="conNombre" value={named.id} />);
+    expect(screen.queryByText('sin nombre en el dump')).toBeNull();
   });
 });

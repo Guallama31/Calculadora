@@ -357,7 +357,7 @@ Todas las acciones del §7 se implementaron y se verificaron con la batería com
 | `npm run format:check` | Todo el código con el estilo de Prettier |
 | `npm run lint` | 0 errores, 0 avisos |
 | `npm run check` | 55/55 archivos con sintaxis correcta |
-| `npm test` | **102 pruebas en 10 archivos**, todas en verde |
+| `npm test` | **103 pruebas en 10 archivos**, todas en verde |
 | `npm run test:coverage` | 87,5 % sentencias · 79,3 % ramas · 82,9 % funciones · 90,2 % líneas |
 | `npm run build` | 1.675 módulos, `dist/` con `index.html`, CSS, chunk de app, chunk de catálogo y `docs/` |
 | `npm run dev` | Catálogo servido sin transformar por el middleware; `/favicon.svg` y `/docs/*.md` responden 200 |
@@ -375,7 +375,7 @@ Los tres pendientes técnicos del informe se resolvieron en un commit aparte, si
 - muestra la etiqueta «sin nombre en el dump» en la ficha del ítem (`ItemSelector`), y
 - avisa en Crianza cuando la cría o el alimento elegido no tienen nombre oficial.
 
-Queda cubierto por `tests/catalog.test.jsx` (4 pruebas: la bandera solo afecta a lo marcado, sobrevive al registro del catálogo y los nombres en español no se marcan). Si se quieren nombres en español para esos ítems, es una tabla curada a mano —las variantes de mapa no se distinguen entre sí en el dump—, y por eso se deja como decisión aparte.
+Queda cubierto por `tests/catalog.test.jsx` (5 pruebas: la bandera solo afecta a lo marcado, sobrevive al registro del catálogo, los nombres en español no se marcan y la ficha del ítem muestra u omite la etiqueta según corresponda). Si se quieren nombres en español para esos ítems, es una tabla curada a mano —las variantes de mapa no se distinguen entre sí en el dump—, y por eso se deja como decisión aparte.
 
 **Otros ajustes de la tanda.** Los dos avisos de `react-hooks/exhaustive-deps` de `CalculatorView` desaparecieron reemplazando el `useMemo` de configuración inicial por una función `initialConfig(prefs)` usada como inicializador perezoso de `useState` (mismo comportamiento, sin `eslint-disable`).
 
